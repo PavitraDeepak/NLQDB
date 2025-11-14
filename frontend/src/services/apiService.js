@@ -1,12 +1,9 @@
 import api from './api';
 
-export const authService = {
-  login: async (email, password) => {
-    const response = await api.post('/auth/login', { email, password });
-    if (response.data.success) {
-      localStorage.setItem('token', response.data.data.token);
-      localStorage.setItem('user', JSON.stringify(response.data.data.user));
-    }
+const apiService = {
+  // Auth
+  login: async (credentials) => {
+    const response = await api.post('/auth/login', credentials);
     return response.data;
   },
 
@@ -17,65 +14,114 @@ export const authService = {
 
   logout: () => {
     localStorage.removeItem('token');
-    localStorage.removeItem('user');
   },
 
-  getCurrentUser: () => {
-    const user = localStorage.getItem('user');
-    return user ? JSON.parse(user) : null;
-  },
-
-  getProfile: async () => {
-    const response = await api.get('/auth/profile');
-    return response.data;
-  }
-};
-
-export const queryService = {
-  translate: async (userQuery, context = {}) => {
-    const response = await api.post('/translate', { userQuery, context });
+  // Organizations
+  getCurrentOrganization: async () => {
+    const response = await api.get('/organizations/current');
     return response.data;
   },
 
-  execute: async (mongoQueryId, options = {}) => {
-    const response = await api.post('/execute', { mongoQueryId, options });
+  getUsageSummary: async () => {
+    const response = await api.get('/organizations/current/usage');
     return response.data;
   },
 
-  getHistory: async (page = 1, limit = 20) => {
-    const response = await api.get('/history', { params: { page, limit } });
+  getTeamMembers: async () => {
+    const response = await api.get('/organizations/current/team');
     return response.data;
   },
 
-  getResult: async (resultId) => {
-    const response = await api.get(`/results/${resultId}`);
+  inviteTeamMember: async (data) => {
+    const response = await api.post('/organizations/current/team/invite', data);
     return response.data;
   },
 
-  getStatistics: async (timeRange = 'week') => {
-    const response = await api.get('/stats', { params: { timeRange } });
-    return response.data;
-  }
-};
-
-export const schemaService = {
-  getSchema: async () => {
-    const response = await api.get('/schema');
+  removeTeamMember: async (memberId) => {
+    const response = await api.delete(`/organizations/current/team/${memberId}`);
     return response.data;
   },
 
+  updateMemberRole: async (memberId, role) => {
+    const response = await api.put(`/organizations/current/team/${memberId}`, { role });
+    return response.data;
+  },
+
+  // Billing
+  getCurrentSubscription: async () => {
+    const response = await api.get('/billing/subscription');
+    return response.data;
+  },
+
+  getPlans: async () => {
+    const response = await api.get('/billing/plans');
+    return response.data;
+  },
+
+  upgradePlan: async (planId) => {
+    const response = await api.post('/billing/upgrade', { planId });
+    return response.data;
+  },
+
+  createPortalSession: async () => {
+    const response = await api.post('/billing/portal');
+    return response.data;
+  },
+
+  // API Keys
+  getApiKeys: async () => {
+    const response = await api.get('/apikeys');
+    return response.data;
+  },
+
+  createApiKey: async (data) => {
+    const response = await api.post('/apikeys', data);
+    return response.data;
+  },
+
+  revokeApiKey: async (id) => {
+    const response = await api.post(`/apikeys/${id}/revoke`);
+    return response.data;
+  },
+
+  rotateApiKey: async (id) => {
+    const response = await api.post(`/apikeys/${id}/rotate`);
+    return response.data;
+  },
+
+  // Queries
+  translateQuery: async (data) => {
+    const response = await api.post('/query/translate', data);
+    return response.data;
+  },
+
+  executeQuery: async (data) => {
+    const response = await api.post('/query/execute', data);
+    return response.data;
+  },
+
+  getQueryHistory: async () => {
+    const response = await api.get('/query/history');
+    return response.data;
+  },
+
+  // Schema
   getCollections: async () => {
-    const response = await api.get('/tables');
+    const response = await api.get('/schema/collections');
     return response.data;
   },
 
-  getCollectionPreview: async (collection, limit = 10) => {
-    const response = await api.get(`/tables/${collection}/preview`, { params: { limit } });
+  getSchema: async (collection) => {
+    const response = await api.get(`/schema/collections/${collection}`);
     return response.data;
   },
 
-  getCollectionStats: async (collection) => {
-    const response = await api.get(`/tables/${collection}/stats`);
+  getSampleData: async (collection, limit = 10) => {
+    const response = await api.get(`/schema/collections/${collection}/sample`, {
+      params: { limit }
+    });
     return response.data;
-  }
+  },
 };
+
+export default apiService;

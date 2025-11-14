@@ -1,30 +1,19 @@
-import OpenAI from 'openai';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Logger } from '../middlewares/logger.js';
 
 class LLMService {
   constructor() {
-    this.provider = process.env.LLM_PROVIDER || 'openai';
     this.temperature = parseFloat(process.env.LLM_TEMPERATURE) || 0.0;
     this.maxTokens = parseInt(process.env.LLM_MAX_TOKENS) || 800;
 
-    // Initialize based on provider
-    if (this.provider === 'google') {
-      const apiKey = process.env.GOOGLE_AI_API_KEY;
-      if (!apiKey) {
-        Logger.warn('GOOGLE_AI_API_KEY not set, LLM features will be unavailable');
-      } else {
-        this.googleAI = new GoogleGenerativeAI(apiKey);
-        this.model = process.env.LLM_MODEL || 'gemini-pro';
-      }
+    // Initialize Google AI
+    const apiKey = process.env.GOOGLE_AI_API_KEY;
+    if (!apiKey) {
+      Logger.warn('GOOGLE_AI_API_KEY not set, LLM features will be unavailable');
     } else {
-      const apiKey = process.env.OPENAI_API_KEY;
-      if (!apiKey) {
-        Logger.warn('OPENAI_API_KEY not set, LLM features will be unavailable');
-      } else {
-        this.client = new OpenAI({ apiKey });
-        this.model = process.env.LLM_MODEL || 'gpt-4';
-      }
+      this.googleAI = new GoogleGenerativeAI(apiKey);
+      this.model = process.env.LLM_MODEL || 'gemini-pro';
+      Logger.info('LLM Service initialized with Google AI', { model: this.model });
     }
   }
 
@@ -104,7 +93,7 @@ Output:
    */
   async translateQuery(userQuery, schema, userRole = 'viewer', context = {}) {
     try {
-      Logger.info('LLM translation request', { userQuery, userRole, provider: this.provider });
+      Logger.info('LLM translation request', { userQuery, userRole, provider: 'google' });
 
       const systemPrompt = this.buildSystemPrompt(schema, userRole);
       
@@ -113,39 +102,20 @@ Context: ${JSON.stringify(context)}
 
 Generate MongoDB query following the constraints above.`;
 
-      let responseText;
-      let tokensUsed = 0;
-
-      if (this.provider === 'google') {
-        // Google AI (Gemini)
-        const model = this.googleAI.getGenerativeModel({ model: this.model });
-        const fullPrompt = systemPrompt + '\n\n' + userPrompt;
-        
-        const result = await model.generateContent({
-          contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
-          generationConfig: {
-            temperature: this.temperature,
-            maxOutputTokens: this.maxTokens,
-          }
-        });
-        
-        responseText = result.response.text();
-        tokensUsed = result.response.usageMetadata?.totalTokenCount || 0;
-      } else {
-        // OpenAI
-        const completion = await this.client.chat.completions.create({
-          model: this.model,
+      // Google AI (Gemini)
+      const model = this.googleAI.getGenerativeModel({ model: this.model });
+      const fullPrompt = systemPrompt + '\n\n' + userPrompt;
+      
+      const result = await model.generateContent({
+        contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
+        generationConfig: {
           temperature: this.temperature,
-          max_tokens: this.maxTokens,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt }
-          ]
-        });
-
-        responseText = completion.choices[0].message.content.trim();
-        tokensUsed = completion.usage.total_tokens;
-      }
+          maxOutputTokens: this.maxTokens,
+        }
+      });
+      
+      const responseText = result.response.text();
+      const tokensUsed = result.response.usageMetadata?.totalTokenCount || 0;
 
       Logger.debug('LLM raw response', { responseText });
 
