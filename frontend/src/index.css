@@ -17,5 +17,55 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+
+  /* Supabase-style scrollbars */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-gray-100;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-300 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-400;
+  }
 }
+
+@layer components {
+  /* Typography utilities matching Supabase */
+  .text-page-title {
+    @apply text-2xl font-semibold text-gray-900;
+  }
+
+  .text-page-subtitle {
+    @apply text-sm text-gray-500;
+  }
+
+  .text-section-title {
+    @apply text-lg font-medium text-gray-900;
+  }
+
+  .text-body {
+    @apply text-sm text-gray-700 leading-6;
+  }
+
+  .text-label {
+    @apply text-sm font-medium text-gray-800;
+  }
+
+  /* Card utility */
+  .card-supabase {
+    @apply bg-white border border-gray-200 rounded-lg p-6;
+  }
+
+  /* Focus rings matching Supabase */
+  .focus-ring {
+    @apply focus:ring-2 focus:ring-black focus:border-black focus:outline-none;
+  }
 }

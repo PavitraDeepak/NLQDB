@@ -10,6 +10,7 @@ import ApiKeys from './pages/ApiKeys';
 import Billing from './pages/Billing';
 import Organization from './pages/Organization';
 import Settings from './pages/Settings';
+import StyleGuide from './pages/StyleGuide';
 
 function App() {
   const [loading, setLoading] = useState(true);
@@ -71,6 +72,10 @@ function App() {
       <Route
         path="/settings"
         element={isAuthenticated ? <Settings /> : <Navigate to="/login" />}
+      />
+      <Route
+        path="/style-guide"
+        element={isAuthenticated ? <StyleGuide /> : <Navigate to="/login" />}
       />
 
       {/* Default redirect */}
