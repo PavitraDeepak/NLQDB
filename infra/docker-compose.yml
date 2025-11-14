@@ -1,0 +1,106 @@
+services:
+  # MongoDB
+  mongo:
+    image: mongo:7.0
+    container_name: nlqdb-mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin123
+      MONGO_INITDB_DATABASE: nlqdb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+      - ../scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    networks:
+      - nlqdb-network
+
+  # Redis (for caching and rate limiting)
+  redis:
+    image: redis:7-alpine
+    container_name: nlqdb-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - nlqdb-network
+
+  # Backend API
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: nlqdb-backend
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      NODE_ENV: development
+      PORT: 5000
+      MONGO_URI: mongodb://mongo:27017/nlqdb
+      MONGO_USER: admin
+      MONGO_PASSWORD: admin123
+      READONLY_DB_USER: nlq_readonly
+      READONLY_DB_PASS: readonly123
+      JWT_SECRET: dev-secret-key-change-in-production
+      GOOGLE_AI_API_KEY: ${GOOGLE_AI_API_KEY:-}
+      LLM_PROVIDER: google
+      LLM_MODEL: gemini-pro
+      REDIS_URL: redis://redis:6379
+      REDIS_ENABLED: true
+    depends_on:
+      - mongo
+      - redis
+    volumes:
+      - ../backend/src:/app/src
+    networks:
+      - nlqdb-network
+
+  # Frontend
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      target: development
+    container_name: nlqdb-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      VITE_API_URL: http://localhost:5000/api
+    depends_on:
+      - backend
+    volumes:
+      - ../frontend/src:/app/src
+      - ../frontend/public:/app/public
+    networks:
+      - nlqdb-network
+
+  # Mongo Express (optional - for DB management)
+  mongo-express:
+    image: mongo-express:latest
+    container_name: nlqdb-mongo-express
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: admin
+      ME_CONFIG_MONGODB_ADMINPASSWORD: admin123
+      ME_CONFIG_MONGODB_URL: mongodb://admin:admin123@mongo:27017/
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: admin
+    depends_on:
+      - mongo
+    networks:
+      - nlqdb-network
+
+networks:
+  nlqdb-network:
+    driver: bridge
+
+volumes:
+  mongo_data:
+  redis_data:
