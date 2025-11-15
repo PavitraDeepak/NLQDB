@@ -12,7 +12,9 @@ import {
   Trash2, 
   Crown, 
   Shield, 
-  User 
+  User,
+  AlertCircle,
+  CheckCircle
 } from 'lucide-react';
 import apiService from '../services/apiService';
 
@@ -23,6 +25,8 @@ const Organization = () => {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('member');
+  const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
 
   useEffect(() => {
     fetchOrganizationData();
@@ -30,14 +34,20 @@ const Organization = () => {
 
   const fetchOrganizationData = async () => {
     try {
+      setError(null);
       const [orgData, membersData] = await Promise.all([
         apiService.getCurrentOrganization(),
         apiService.getTeamMembers()
       ]);
+      
+      console.log('Organization Data:', orgData);
+      console.log('Members Data:', membersData);
+      
       setOrganization(orgData);
-      setMembers(membersData);
+      setMembers(Array.isArray(membersData) ? membersData : []);
     } catch (error) {
       console.error('Failed to fetch organization data:', error);
+      setError('Failed to load organization data. Please try refreshing the page.');
     } finally {
       setLoading(false);
     }
@@ -45,6 +55,7 @@ const Organization = () => {
 
   const handleInviteMember = async () => {
     try {
+      setError(null);
       await apiService.inviteTeamMember({
         email: inviteEmail,
         role: inviteRole
@@ -52,9 +63,12 @@ const Organization = () => {
       setShowInviteModal(false);
       setInviteEmail('');
       setInviteRole('member');
+      setSuccessMessage('Invitation sent successfully!');
+      setTimeout(() => setSuccessMessage(null), 3000);
       fetchOrganizationData();
     } catch (error) {
       console.error('Failed to invite member:', error);
+      setError(error.response?.data?.error || 'Failed to send invitation');
     }
   };
 
@@ -62,19 +76,27 @@ const Organization = () => {
     if (!confirm('Are you sure you want to remove this team member?')) return;
 
     try {
+      setError(null);
       await apiService.removeTeamMember(memberId);
+      setSuccessMessage('Team member removed successfully');
+      setTimeout(() => setSuccessMessage(null), 3000);
       fetchOrganizationData();
     } catch (error) {
       console.error('Failed to remove member:', error);
+      setError(error.response?.data?.error || 'Failed to remove team member');
     }
   };
 
   const handleUpdateRole = async (memberId, newRole) => {
     try {
+      setError(null);
       await apiService.updateMemberRole(memberId, newRole);
+      setSuccessMessage('Role updated successfully');
+      setTimeout(() => setSuccessMessage(null), 3000);
       fetchOrganizationData();
     } catch (error) {
       console.error('Failed to update role:', error);
+      setError(error.response?.data?.error || 'Failed to update member role');
     }
   };
 
@@ -130,14 +152,14 @@ const Organization = () => {
           <div className="flex items-center gap-2">
             <select
               value={row.organizationRole}
-              onChange={(e) => handleUpdateRole(row._id, e.target.value)}
+              onChange={(e) => handleUpdateRole(row.id, e.target.value)}
               className="text-xs px-2 py-1 border border-gray-300 rounded-md focus:ring-2 focus:ring-black focus:border-black"
             >
               <option value="member">Member</option>
               <option value="admin">Admin</option>
             </select>
             <button
-              onClick={() => handleRemoveMember(row._id)}
+              onClick={() => handleRemoveMember(row.id)}
               className="p-1 text-gray-400 hover:text-red-600"
               title="Remove member"
             >
@@ -173,6 +195,39 @@ const Organization = () => {
             Manage your organization settings and team members
           </p>
         </div>
+
+        {/* Error Message */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-red-600 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-red-800">Error</p>
+              <p className="text-sm text-red-600 mt-1">{error}</p>
+            </div>
+            <button 
+              onClick={() => setError(null)}
+              className="text-red-400 hover:text-red-600"
+            >
+              ×
+            </button>
+          </div>
+        )}
+
+        {/* Success Message */}
+        {successMessage && (
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-start gap-3">
+            <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-green-800">{successMessage}</p>
+            </div>
+            <button 
+              onClick={() => setSuccessMessage(null)}
+              className="text-green-400 hover:text-green-600"
+            >
+              ×
+            </button>
+          </div>
+        )}
 
         {/* Organization Info */}
         <Card className="mb-6" title="Organization Details">
@@ -220,12 +275,75 @@ const Organization = () => {
           </div>
         </Card>
 
+        {/* Usage Statistics */}
+        <Card className="mb-6" title="Usage & Limits">
+          <div className="grid grid-cols-4 gap-6">
+            <div>
+              <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Queries This Month</p>
+              <div className="flex items-baseline gap-2">
+                <p className="text-2xl font-semibold text-gray-900">
+                  {organization?.usage?.queriesThisMonth || 0}
+                </p>
+                <span className="text-sm text-gray-500">/ {organization?.limits?.queriesPerMonth || 0}</span>
+              </div>
+              <div className="mt-2 w-full bg-gray-200 rounded-full h-1.5">
+                <div 
+                  className="bg-black h-1.5 rounded-full" 
+                  style={{ width: `${Math.min(100, (organization?.usage?.queriesThisMonth || 0) / (organization?.limits?.queriesPerMonth || 1) * 100)}%` }}
+                ></div>
+              </div>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Team Members</p>
+              <div className="flex items-baseline gap-2">
+                <p className="text-2xl font-semibold text-gray-900">
+                  {members.length}
+                </p>
+                <span className="text-sm text-gray-500">/ {organization?.limits?.maxTeamMembers || '∞'}</span>
+              </div>
+              <div className="mt-2 w-full bg-gray-200 rounded-full h-1.5">
+                <div 
+                  className="bg-black h-1.5 rounded-full" 
+                  style={{ width: `${Math.min(100, members.length / (organization?.limits?.maxTeamMembers || 1) * 100)}%` }}
+                ></div>
+              </div>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">API Keys</p>
+              <div className="flex items-baseline gap-2">
+                <p className="text-2xl font-semibold text-gray-900">
+                  0
+                </p>
+                <span className="text-sm text-gray-500">/ {organization?.limits?.maxApiKeys || 0}</span>
+              </div>
+              <div className="mt-2 w-full bg-gray-200 rounded-full h-1.5">
+                <div className="bg-black h-1.5 rounded-full" style={{ width: '0%' }}></div>
+              </div>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Storage Used</p>
+              <div className="flex items-baseline gap-2">
+                <p className="text-2xl font-semibold text-gray-900">
+                  {(organization?.usage?.storageMB || 0).toFixed(1)}
+                </p>
+                <span className="text-sm text-gray-500">MB / {organization?.limits?.storageLimitMB || 0} MB</span>
+              </div>
+              <div className="mt-2 w-full bg-gray-200 rounded-full h-1.5">
+                <div 
+                  className="bg-black h-1.5 rounded-full" 
+                  style={{ width: `${Math.min(100, (organization?.usage?.storageMB || 0) / (organization?.limits?.storageLimitMB || 1) * 100)}%` }}
+                ></div>
+              </div>
+            </div>
+          </div>
+        </Card>
+
         {/* Team Members Section */}
         <div className="mb-6 flex items-center justify-between">
           <div>
             <h2 className="text-lg font-medium text-gray-900">Team Members</h2>
             <p className="text-sm text-gray-500 mt-1">
-              {members.length} of {organization?.limits?.maxTeamMembers || '∞'} members
+              Manage your team and control access permissions
             </p>
           </div>
           <Button
