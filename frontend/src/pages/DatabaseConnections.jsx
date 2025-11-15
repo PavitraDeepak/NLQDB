@@ -4,7 +4,7 @@ import Card from '../components/Card';
 import Button from '../components/Button';
 import Modal from '../components/Modal';
 import Input from '../components/Input';
-import { Database, Plus, Trash2, RefreshCw, TestTube, Key, AlertCircle, CheckCircle } from 'lucide-react';
+import { Database, Plus, Trash2, RefreshCw, TestTube, Key, AlertCircle, CheckCircle, Eye, EyeOff } from 'lucide-react';
 import apiService from '../services/apiService';
 
 const DatabaseConnections = () => {
@@ -14,6 +14,9 @@ const DatabaseConnections = () => {
   const [editingConnection, setEditingConnection] = useState(null);
   const [testingConnection, setTestingConnection] = useState(null);
   const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showUri, setShowUri] = useState(false);
+  const [visibleDetails, setVisibleDetails] = useState({}); // Track which connection details are visible
 
   const [formData, setFormData] = useState({
     name: '',
@@ -167,6 +170,21 @@ const DatabaseConnections = () => {
     });
     setEditingConnection(null);
     setError('');
+    setShowPassword(false);
+    setShowUri(false);
+  };
+
+  const toggleDetailVisibility = (connectionId) => {
+    setVisibleDetails(prev => ({
+      ...prev,
+      [connectionId]: !prev[connectionId]
+    }));
+  };
+
+  const maskValue = (value) => {
+    if (!value) return '••••••••';
+    if (value.length <= 8) return '••••••••';
+    return value.substring(0, 4) + '••••' + value.substring(value.length - 4);
   };
 
   const getStatusBadge = (status) => {
@@ -269,6 +287,21 @@ const DatabaseConnections = () => {
                           <span className="text-gray-500">Database:</span>
                           <span className="text-gray-900 font-mono text-xs">{connection.database || 'default'}</span>
                         </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-gray-500">Connection:</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-gray-400 font-mono text-xs truncate max-w-[120px]">
+                              {visibleDetails[connection.id] ? '(Stored securely)' : 'mongodb://•••@•••/***'}
+                            </span>
+                            <button
+                              onClick={() => toggleDetailVisibility(connection.id)}
+                              className="text-gray-400 hover:text-gray-600 transition-colors"
+                              title={visibleDetails[connection.id] ? "Hide details" : "Show details"}
+                            >
+                              {visibleDetails[connection.id] ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                            </button>
+                          </div>
+                        </div>
                       </>
                     ) : (
                       <>
@@ -280,9 +313,20 @@ const DatabaseConnections = () => {
                           <span className="text-gray-500">Database:</span>
                           <span className="text-gray-900 font-mono text-xs">{connection.database}</span>
                         </div>
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between gap-2">
                           <span className="text-gray-500">User:</span>
-                          <span className="text-gray-900 font-mono text-xs">{connection.username}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-gray-900 font-mono text-xs">
+                              {visibleDetails[connection.id] ? connection.username : maskValue(connection.username)}
+                            </span>
+                            <button
+                              onClick={() => toggleDetailVisibility(connection.id)}
+                              className="text-gray-400 hover:text-gray-600 transition-colors"
+                              title={visibleDetails[connection.id] ? "Hide details" : "Show details"}
+                            >
+                              {visibleDetails[connection.id] ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                            </button>
+                          </div>
                         </div>
                       </>
                     )}
@@ -430,14 +474,31 @@ const DatabaseConnections = () => {
 
             {/* Conditional Fields based on Connection Method */}
             {formData.connectionMethod === 'uri' ? (
-              <Input
-                label="Connection URI"
-                value={formData.uri}
-                onChange={(e) => setFormData({ ...formData, uri: e.target.value })}
-                placeholder="mongodb://username:password@localhost:27017/database"
-                required
-                className="font-mono text-sm"
-              />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Connection URI
+                </label>
+                <div className="relative">
+                  <input
+                    type={showUri ? "text" : "password"}
+                    value={formData.uri}
+                    onChange={(e) => setFormData({ ...formData, uri: e.target.value })}
+                    placeholder="mongodb://username:password@localhost:27017/database"
+                    required
+                    className="w-full px-3 py-2 pr-10 bg-white border border-gray-300 rounded-md text-sm font-mono focus:ring-2 focus:ring-black focus:border-black"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowUri(!showUri)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showUri ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <p className="mt-1 text-xs text-gray-500">
+                  Full connection string including credentials
+                </p>
+              </div>
             ) : (
               <>
                 <div className="grid grid-cols-4 gap-4">
@@ -477,14 +538,33 @@ const DatabaseConnections = () => {
                   required
                 />
 
-                <Input
-                  label="Password"
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  placeholder={editingConnection ? "Leave blank to keep current" : "••••••••"}
-                  required={!editingConnection}
-                />
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      placeholder={editingConnection ? "Leave blank to keep current" : "••••••••"}
+                      required={!editingConnection}
+                      className="w-full px-3 py-2 pr-10 bg-white border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-black focus:border-black"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  {editingConnection && (
+                    <p className="mt-1 text-xs text-gray-500">
+                      Leave blank to keep the current password
+                    </p>
+                  )}
+                </div>
               </>
             )}
 
