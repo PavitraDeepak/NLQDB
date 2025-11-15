@@ -163,12 +163,13 @@ export const getTeamMembers = async (req, res) => {
  */
 export const inviteTeamMember = async (req, res) => {
   try {
-    const { id } = req.params;
+    // Use organizationId from tenant resolver if route uses 'current'
+    const organizationId = req.params.id === 'current' ? req.tenant.id : req.params.id;
     const { email, role, name } = req.body;
     const inviterId = req.user._id;
 
     const member = await organizationService.inviteTeamMember(
-      id,
+      organizationId,
       inviterId,
       { email, role, name }
     );
