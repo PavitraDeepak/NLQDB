@@ -18,6 +18,12 @@ router.post('/', organizationController.createOrganization);
 // Get current user's organization
 router.get('/current', tenantResolver, organizationController.getCurrentOrganization);
 
+// Get current organization's usage
+router.get('/current/usage', tenantResolver, organizationController.getCurrentOrgUsage);
+
+// Get current organization's team
+router.get('/current/team', tenantResolver, organizationController.getCurrentOrgTeam);
+
 // Get organization by ID
 router.get('/:id', tenantResolver, organizationController.getOrganization);
 

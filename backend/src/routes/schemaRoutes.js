@@ -16,8 +16,9 @@ router.use(requireAuth);
 // Get database schema for current user
 router.get('/schema', getSchema);
 
-// List all accessible collections
+// List all accessible collections (support both /tables and /schema/collections)
 router.get('/tables', listCollections);
+router.get('/schema/collections', listCollections);
 
 // Get collection preview
 router.get('/tables/:collection/preview', getCollectionPreview);

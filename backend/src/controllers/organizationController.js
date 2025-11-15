@@ -290,6 +290,68 @@ export const deleteOrganization = async (req, res) => {
   }
 };
 
+/**
+ * Get current organization's usage (wrapper for /current/usage)
+ * GET /api/organizations/current/usage
+ */
+export const getCurrentOrgUsage = async (req, res) => {
+  try {
+    // req.organization is set by tenantResolver middleware
+    const organizationId = req.organization?._id;
+    
+    if (!organizationId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Organization context not found'
+      });
+    }
+
+    const summary = await organizationService.getUsageSummary(organizationId);
+
+    res.json({
+      success: true,
+      data: summary
+    });
+  } catch (error) {
+    Logger.error('Get current org usage failed', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get usage summary'
+    });
+  }
+};
+
+/**
+ * Get current organization's team (wrapper for /current/team)
+ * GET /api/organizations/current/team
+ */
+export const getCurrentOrgTeam = async (req, res) => {
+  try {
+    // req.organization is set by tenantResolver middleware
+    const organizationId = req.organization?._id;
+    
+    if (!organizationId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Organization context not found'
+      });
+    }
+
+    const members = await organizationService.getTeamMembers(organizationId);
+
+    res.json({
+      success: true,
+      data: members
+    });
+  } catch (error) {
+    Logger.error('Get current org team failed', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get team members'
+    });
+  }
+};
+
 export default {
   createOrganization,
   getCurrentOrganization,
@@ -301,5 +363,7 @@ export default {
   updateMemberRole,
   removeTeamMember,
   transferOwnership,
-  deleteOrganization
+  deleteOrganization,
+  getCurrentOrgUsage,
+  getCurrentOrgTeam
 };

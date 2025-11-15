@@ -2,6 +2,9 @@ import express from 'express';
 import authRoutes from './authRoutes.js';
 import queryRoutes from './queryRoutes.js';
 import schemaRoutes from './schemaRoutes.js';
+import organizationRoutes from './organizationRoutes.js';
+import billingRoutes from './billingRoutes.js';
+import apiKeyRoutes from './apiKeyRoutes.js';
 
 const router = express.Router();
 
@@ -16,6 +19,9 @@ router.get('/health', (req, res) => {
 
 // Mount routes
 router.use('/auth', authRoutes);
+router.use('/organizations', organizationRoutes);
+router.use('/billing', billingRoutes);
+router.use('/apikeys', apiKeyRoutes);
 router.use('/', queryRoutes); // Query routes at /api/translate, /api/execute, etc.
 router.use('/', schemaRoutes); // Schema routes at /api/schema, /api/tables, etc.
 

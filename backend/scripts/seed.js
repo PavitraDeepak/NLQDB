@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import path from 'path';
-import { User, Customer, Order } from '../src/models/index.js';
+import { User, Customer, Order, Organization } from '../src/models/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -177,12 +177,49 @@ const seedDatabase = async () => {
     await User.deleteMany({});
     await Customer.deleteMany({});
     await Order.deleteMany({});
+    await Organization.deleteMany({});
     console.log('✓ Existing data cleared\n');
 
-    // Create users
-    console.log('Creating users...');
-    const createdUsers = await User.create(users);
-    console.log(`✓ Created ${createdUsers.length} users\n`);
+    // Create admin user first (without organization)
+    console.log('Creating admin user...');
+    const adminUser = await User.create({
+      name: 'Admin User',
+      email: 'admin@example.com',
+      password: 'admin123',
+      role: 'admin',
+      organizationRole: 'owner'
+    });
+    console.log(`✓ Created admin user\n`);
+
+    // Create organization with admin as owner
+    console.log('Creating organization...');
+    const organization = await Organization.create({
+      name: 'Demo Organization',
+      slug: 'demo-org',
+      ownerUserId: adminUser._id,
+      settings: {
+        defaultDatabase: 'nlqdb',
+        queryTimeout: 30000,
+        maxQueryResultSize: 1000
+      },
+      status: 'active'
+    });
+    console.log(`✓ Created organization: ${organization.name}\n`);
+
+    // Update admin user with organization ID
+    adminUser.organizationId = organization._id;
+    await adminUser.save();
+
+    // Create other users with organization reference
+    console.log('Creating other users...');
+    const otherUsersWithOrg = users.slice(1).map(user => ({
+      ...user,
+      organizationId: organization._id,
+      organizationRole: 'member'
+    }));
+    const otherUsers = await User.create(otherUsersWithOrg);
+    const createdUsers = [adminUser, ...otherUsers];
+    console.log(`✓ Created ${createdUsers.length} users total\n`);
 
     // Create customers
     console.log('Creating customers...');

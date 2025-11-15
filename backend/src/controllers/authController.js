@@ -89,9 +89,14 @@ export const login = asyncHandler(async (req, res) => {
   user.lastLogin = new Date();
   await user.save();
 
-  // Generate JWT token
+  // Generate JWT token with organizationId
   const token = jwt.sign(
-    { id: user._id, role: user.role },
+    { 
+      id: user._id, 
+      role: user.role,
+      organizationId: user.organizationId,
+      organizationRole: user.organizationRole
+    },
     process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRE || '7d' }
   );

@@ -36,8 +36,9 @@ router.post(
 // Get query result by ID
 router.get('/results/:id', getQueryResult);
 
-// Get query history
+// Get query history (support both /history and /query/history)
 router.get('/history', getHistory);
+router.get('/query/history', getHistory);
 
 // Get statistics
 router.get('/stats', getStatistics);
