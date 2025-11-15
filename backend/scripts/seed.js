@@ -13,12 +13,20 @@ dotenv.config({ path: path.join(__dirname, '../.env') });
 // Connect to MongoDB
 const connectDB = async () => {
   try {
-    await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/nlqdb', {
-      auth: {
-        username: process.env.MONGO_USER || 'admin',
-        password: process.env.MONGO_PASSWORD || 'admin123'
-      }
-    });
+    const mongoUri = process.env.MONGO_URI;
+    const hasCredentialsInUri = mongoUri.includes('@') || mongoUri.startsWith('mongodb+srv://');
+    
+    const connectionOptions = {};
+    
+    // Only add auth if separate credentials are provided and not in URI
+    if (process.env.MONGO_USER && process.env.MONGO_PASSWORD && !hasCredentialsInUri) {
+      connectionOptions.auth = {
+        username: process.env.MONGO_USER,
+        password: process.env.MONGO_PASSWORD
+      };
+    }
+    
+    await mongoose.connect(mongoUri, connectionOptions);
     console.log('✓ MongoDB connected');
   } catch (error) {
     console.error('✗ MongoDB connection failed:', error.message);
