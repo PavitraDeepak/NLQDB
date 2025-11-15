@@ -421,7 +421,8 @@ export const getSchema = async (req, res) => {
     const { refresh } = req.query;
     const organizationId = req.organization._id;
 
-    const connection = await DatabaseConnection.findOne({ _id: id, organizationId });
+    const connection = await DatabaseConnection.findOne({ _id: id, organizationId })
+      .select('+encryptedPassword +encryptionIV +encryptedUri +uriEncryptionIV');
 
     if (!connection) {
       return res.status(404).json({
