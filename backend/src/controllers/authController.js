@@ -1,14 +1,14 @@
 import jwt from 'jsonwebtoken';
-import { User } from '../models/index.js';
+import { User, Organization } from '../models/index.js';
 import { asyncHandler } from '../middlewares/index.js';
 import { Logger } from '../middlewares/logger.js';
 
 /**
- * Register new user (admin only)
+ * Register new user
  * POST /api/auth/register
  */
 export const register = asyncHandler(async (req, res) => {
-  const { name, email, password, role } = req.body;
+  const { name, email, password, organizationName } = req.body;
 
   // Check if user already exists
   const existingUser = await User.findOne({ email });
@@ -19,28 +19,66 @@ export const register = asyncHandler(async (req, res) => {
     });
   }
 
-  // Create user
+  // Create organization
+  const organization = await Organization.create({
+    name: organizationName || `${name}'s Organization`,
+    owner: null, // Will be set after user creation
+    members: [],
+    settings: {
+      allowSignup: false,
+      requireEmailVerification: false
+    }
+  });
+
+  // Create user as organization owner
   const user = await User.create({
     name,
     email,
     password,
-    role: role || 'viewer'
+    organizationId: organization._id,
+    organizationRole: 'owner'
   });
 
-  Logger.info('User registered', {
+  // Update organization with owner
+  organization.owner = user._id;
+  organization.members.push({
+    userId: user._id,
+    role: 'owner',
+    joinedAt: new Date()
+  });
+  await organization.save();
+
+  Logger.info('User registered with organization', {
     userId: user._id,
     email: user.email,
-    role: user.role
+    organizationId: organization._id,
+    role: user.organizationRole
   });
+
+  // Generate token
+  const token = jwt.sign(
+    {
+      userId: user._id,
+      email: user.email,
+      organizationId: user.organizationId,
+      organizationRole: user.organizationRole
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: '7d' }
+  );
 
   res.status(201).json({
     success: true,
     message: 'User registered successfully',
     data: {
-      id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        organizationId: user.organizationId,
+        organizationRole: user.organizationRole
+      }
     }
   });
 });
