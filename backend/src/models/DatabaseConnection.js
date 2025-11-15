@@ -110,15 +110,18 @@ const databaseConnectionSchema = new mongoose.Schema({
   schemaCache: {
     lastUpdated: Date,
     tables: [{
-      name: String,
-      schema: String,
-      columns: [{
-        name: String,
-        type: String,
-        nullable: Boolean,
-        primaryKey: Boolean,
-        foreignKey: Boolean
-      }]
+      name: { type: String, required: true },
+      schema: { type: String, required: true },
+      columns: {
+        type: [{
+          name: { type: String, required: true },
+          type: { type: String, required: true },
+          nullable: { type: Boolean, default: true },
+          primaryKey: { type: Boolean, default: false },
+          foreignKey: { type: Boolean, default: false }
+        }],
+        default: []
+      }
     }]
   },
   // Usage tracking
@@ -149,8 +152,17 @@ const databaseConnectionSchema = new mongoose.Schema({
 databaseConnectionSchema.index({ organizationId: 1, status: 1 });
 databaseConnectionSchema.index({ organizationId: 1, name: 1 }, { unique: true });
 
-// Encryption key from environment
+// Encryption key from environment - MUST be 32 bytes (64 hex characters)
 const ENCRYPTION_KEY = process.env.DB_ENCRYPTION_KEY || crypto.randomBytes(32).toString('hex');
+
+// Validate encryption key
+if (!process.env.DB_ENCRYPTION_KEY) {
+  console.warn('⚠️  WARNING: DB_ENCRYPTION_KEY not set in environment. Using generated key. Encrypted connections will fail after restart!');
+} else if (Buffer.from(ENCRYPTION_KEY, 'hex').length !== 32) {
+  throw new Error('DB_ENCRYPTION_KEY must be exactly 32 bytes (64 hex characters)');
+} else {
+  console.log('✅ Database encryption key loaded from environment');
+}
 
 // Methods
 databaseConnectionSchema.methods.encryptPassword = function(password) {
@@ -187,32 +199,42 @@ databaseConnectionSchema.methods.decryptPassword = function() {
   if (!this.encryptedPassword || !this.encryptionIV) {
     return null;
   }
-  const decipher = crypto.createDecipheriv(
-    'aes-256-cbc',
-    Buffer.from(ENCRYPTION_KEY, 'hex'),
-    Buffer.from(this.encryptionIV, 'hex')
-  );
   
-  let decrypted = decipher.update(this.encryptedPassword, 'hex', 'utf8');
-  decrypted += decipher.final('utf8');
-  
-  return decrypted;
+  try {
+    const decipher = crypto.createDecipheriv(
+      'aes-256-cbc',
+      Buffer.from(ENCRYPTION_KEY, 'hex'),
+      Buffer.from(this.encryptionIV, 'hex')
+    );
+    
+    let decrypted = decipher.update(this.encryptedPassword, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    
+    return decrypted;
+  } catch (error) {
+    throw new Error(`Failed to decrypt password. The encryption key may have changed. Please delete and recreate this connection. Error: ${error.message}`);
+  }
 };
 
 databaseConnectionSchema.methods.decryptUri = function() {
   if (!this.encryptedUri || !this.uriEncryptionIV) {
     return null;
   }
-  const decipher = crypto.createDecipheriv(
-    'aes-256-cbc',
-    Buffer.from(ENCRYPTION_KEY, 'hex'),
-    Buffer.from(this.uriEncryptionIV, 'hex')
-  );
   
-  let decrypted = decipher.update(this.encryptedUri, 'hex', 'utf8');
-  decrypted += decipher.final('utf8');
-  
-  return decrypted;
+  try {
+    const decipher = crypto.createDecipheriv(
+      'aes-256-cbc',
+      Buffer.from(ENCRYPTION_KEY, 'hex'),
+      Buffer.from(this.uriEncryptionIV, 'hex')
+    );
+    
+    let decrypted = decipher.update(this.encryptedUri, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    
+    return decrypted;
+  } catch (error) {
+    throw new Error(`Failed to decrypt URI. The encryption key may have changed. Please delete and recreate this connection. Error: ${error.message}`);
+  }
 };
 
 databaseConnectionSchema.methods.getConnectionString = function() {

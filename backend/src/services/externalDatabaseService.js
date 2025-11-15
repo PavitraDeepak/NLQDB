@@ -745,7 +745,20 @@ class ExternalDatabaseService {
       }
     }
 
-    return Array.from(fields.values());
+    const result = Array.from(fields.values());
+    
+    // If no fields found (empty collection), return array with at least _id field
+    if (result.length === 0) {
+      return [{
+        name: '_id',
+        type: 'ObjectId',
+        nullable: false,
+        primaryKey: true,
+        foreignKey: false
+      }];
+    }
+
+    return result;
   }
 
   groupSchemaByTable(rows) {
