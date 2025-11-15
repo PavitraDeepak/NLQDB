@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import DashboardLayout from '../components/DashboardLayout';
 import Card from '../components/Card';
 import Button from '../components/Button';
-import { Check, CreditCard, Zap, Building2, ArrowRight } from 'lucide-react';
+import { Check, CreditCard, Zap, Building2, ArrowRight, Globe } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import apiService from '../services/apiService';
 
@@ -11,6 +11,43 @@ const Billing = () => {
   const [subscription, setSubscription] = useState(null);
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [currency, setCurrency] = useState('INR'); // Default to INR
+
+  // Currency conversion rate (approximate)
+  const conversionRates = {
+    USD: 1,
+    INR: 83 // 1 USD = 83 INR (approximate)
+  };
+
+  // Detect user's region and set currency
+  useEffect(() => {
+    detectRegionAndSetCurrency();
+  }, []);
+
+  const detectRegionAndSetCurrency = async () => {
+    try {
+      // Try to detect timezone
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      
+      // Check if user is in India based on timezone
+      if (timezone && timezone.includes('Asia/Kolkata') || timezone.includes('Asia/Calcutta')) {
+        setCurrency('INR');
+      } else {
+        // Try to get more accurate location from browser's navigator
+        if (navigator.language) {
+          const lang = navigator.language.toLowerCase();
+          if (lang.includes('in') || lang.includes('hi')) {
+            setCurrency('INR');
+          } else if (lang.includes('us') || lang.includes('en-us')) {
+            setCurrency('USD');
+          }
+        }
+      }
+    } catch (error) {
+      console.log('Could not detect region, using default INR');
+      setCurrency('INR');
+    }
+  };
 
   useEffect(() => {
     fetchBillingData();
@@ -57,6 +94,20 @@ const Billing = () => {
     enterprise: Building2,
   };
 
+  // Format price based on currency
+  const formatPrice = (usdPrice) => {
+    if (currency === 'INR') {
+      const inrPrice = Math.round(usdPrice * conversionRates.INR);
+      return `₹${inrPrice.toLocaleString('en-IN')}`;
+    }
+    return `$${usdPrice}`;
+  };
+
+  // Toggle currency
+  const toggleCurrency = () => {
+    setCurrency(prev => prev === 'USD' ? 'INR' : 'USD');
+  };
+
   if (loading) {
     return (
       <DashboardLayout>
@@ -79,10 +130,30 @@ const Billing = () => {
       <div className="p-10">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-2xl font-semibold text-gray-900">Billing & Plans</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Manage your subscription and billing details
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-semibold text-gray-900">Billing & Plans</h1>
+              <p className="text-sm text-gray-500 mt-1">
+                Manage your subscription and billing details
+              </p>
+            </div>
+            
+            {/* Currency Toggle */}
+            <div className="flex items-center gap-3">
+              <Globe className="w-4 h-4 text-gray-500" />
+              <button
+                onClick={toggleCurrency}
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <span className="text-sm font-medium text-gray-700">
+                  {currency === 'USD' ? '🇺🇸 USD' : '🇮🇳 INR'}
+                </span>
+                <span className="text-xs text-gray-500">
+                  Switch to {currency === 'USD' ? 'INR' : 'USD'}
+                </span>
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Current Subscription Card */}
@@ -154,12 +225,17 @@ const Billing = () => {
                   </h3>
                   <div className="flex items-baseline justify-center gap-1">
                     <span className="text-3xl font-semibold text-gray-900">
-                      ${plan.price}
+                      {formatPrice(plan.price)}
                     </span>
                     {!isFree && (
                       <span className="text-sm text-gray-500">/month</span>
                     )}
                   </div>
+                  {!isFree && currency === 'INR' && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      ≈ ${plan.price} USD
+                    </p>
+                  )}
                 </div>
 
                 {/* Features */}
@@ -210,6 +286,16 @@ const Billing = () => {
             Frequently Asked Questions
           </h2>
           <div className="space-y-4">
+            <Card>
+              <h3 className="text-sm font-medium text-gray-900 mb-2">
+                Which currency will I be charged in?
+              </h3>
+              <p className="text-sm text-gray-600">
+                Prices are displayed in your local currency for convenience. The actual billing currency 
+                depends on your payment method and location. INR prices are approximate conversions and 
+                may vary based on current exchange rates.
+              </p>
+            </Card>
             <Card>
               <h3 className="text-sm font-medium text-gray-900 mb-2">
                 Can I change my plan at any time?
