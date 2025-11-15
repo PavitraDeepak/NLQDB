@@ -21,8 +21,8 @@ const TablesPage = () => {
   }, []);
 
   useEffect(() => {
-    if (selectedConnection) {
-      fetchSchema(selectedConnection._id);
+    if (selectedConnection?.id) {
+      fetchSchema(selectedConnection.id);
     }
   }, [selectedConnection]);
 
@@ -174,11 +174,11 @@ const TablesPage = () => {
               <div className="flex items-center gap-4 overflow-x-auto pb-2">
                 {databaseConnections.map((conn) => (
                   <button
-                    key={conn._id}
+                    key={conn.id}
                     onClick={() => setSelectedConnection(conn)}
                     className={`
                       flex items-center gap-2 px-4 py-2 rounded-lg border-2 transition-all whitespace-nowrap
-                      ${selectedConnection?._id === conn._id
+                      ${selectedConnection?.id === conn.id
                         ? 'border-black bg-gray-50 text-black'
                         : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:text-black'
                       }
