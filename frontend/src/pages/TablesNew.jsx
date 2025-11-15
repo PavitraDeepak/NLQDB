@@ -68,8 +68,8 @@ const TablesPage = () => {
   };
 
   const handleRefresh = () => {
-    if (selectedConnection) {
-      fetchSchema(selectedConnection._id);
+    if (selectedConnection?.id) {
+      fetchSchema(selectedConnection.id);
     }
   };
 
