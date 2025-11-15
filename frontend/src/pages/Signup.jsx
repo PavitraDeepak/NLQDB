@@ -10,6 +10,7 @@ const Signup = () => {
     email: '',
     password: '',
     confirmPassword: '',
+    organizationName: '',
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -43,6 +44,7 @@ const Signup = () => {
         name: formData.name,
         email: formData.email,
         password: formData.password,
+        organizationName: formData.organizationName,
       });
       console.log('Signup response:', response);
       // Registration successful, redirect to login
@@ -91,6 +93,17 @@ const Signup = () => {
               value={formData.name}
               onChange={handleChange}
               placeholder="John Doe"
+              required
+            />
+
+            <Input
+              label="Organization name"
+              type="text"
+              name="organizationName"
+              value={formData.organizationName}
+              onChange={handleChange}
+              placeholder="Acme Corporation"
+              helperText="Your company or team name"
               required
             />
 

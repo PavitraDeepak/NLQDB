@@ -19,34 +19,31 @@ export const register = asyncHandler(async (req, res) => {
     });
   }
 
-  // Create organization
-  const organization = await Organization.create({
-    name: organizationName || `${name}'s Organization`,
-    owner: null, // Will be set after user creation
-    members: [],
-    settings: {
-      allowSignup: false,
-      requireEmailVerification: false
-    }
-  });
+  // Generate slug from organization name or email
+  const orgName = organizationName || `${name}'s Organization`;
+  const slug = orgName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
-  // Create user as organization owner
+  // Create user first (without organization)
   const user = await User.create({
     name,
     email,
     password,
-    organizationId: organization._id,
+    organizationId: null,
     organizationRole: 'owner'
   });
 
-  // Update organization with owner
-  organization.owner = user._id;
-  organization.members.push({
-    userId: user._id,
-    role: 'owner',
-    joinedAt: new Date()
+  // Create organization with the user as owner
+  const organization = await Organization.create({
+    name: orgName,
+    slug: slug,
+    ownerUserId: user._id,
+    plan: 'free',
+    planStatus: 'active'
   });
-  await organization.save();
+
+  // Update user with organization
+  user.organizationId = organization._id;
+  await user.save();
 
   Logger.info('User registered with organization', {
     userId: user._id,
