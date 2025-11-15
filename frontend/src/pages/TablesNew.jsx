@@ -27,12 +27,18 @@ const TablesPage = () => {
   const fetchCollections = async () => {
     try {
       const data = await apiService.getCollections();
-      setCollections(data);
-      if (data.length > 0) {
-        setSelectedCollection(data[0].name);
+      console.log('Collections data:', data);
+      
+      // Ensure data is an array
+      const collectionsArray = Array.isArray(data) ? data : [];
+      setCollections(collectionsArray);
+      
+      if (collectionsArray.length > 0) {
+        setSelectedCollection(collectionsArray[0]); // collectionsArray[0] is a string
       }
     } catch (error) {
       console.error('Failed to fetch collections:', error);
+      setCollections([]); // Set empty array on error
     } finally {
       setLoading(false);
     }
@@ -121,11 +127,11 @@ const TablesPage = () => {
               <div className="space-y-1">
                 {collections.map((collection) => (
                   <button
-                    key={collection.name}
-                    onClick={() => setSelectedCollection(collection.name)}
+                    key={collection}
+                    onClick={() => setSelectedCollection(collection)}
                     className={`
                       w-full flex items-center justify-between px-3 py-2 text-sm rounded-md transition-colors
-                      ${selectedCollection === collection.name
+                      ${selectedCollection === collection
                         ? 'bg-gray-100 text-black font-medium'
                         : 'text-gray-600 hover:bg-gray-50 hover:text-black'
                       }
@@ -133,7 +139,7 @@ const TablesPage = () => {
                   >
                     <div className="flex items-center gap-2">
                       <Database className="w-4 h-4" />
-                      <span>{collection.name}</span>
+                      <span>{collection}</span>
                     </div>
                     <ChevronRight className="w-4 h-4" />
                   </button>

@@ -11,6 +11,7 @@ import Billing from './pages/Billing';
 import Organization from './pages/Organization';
 import Settings from './pages/Settings';
 import StyleGuide from './pages/StyleGuide';
+import DatabaseConnections from './pages/DatabaseConnections';
 
 function App() {
   const [loading, setLoading] = useState(true);
@@ -85,6 +86,10 @@ function App() {
       <Route
         path="/organization"
         element={isAuthenticated ? <Organization /> : <Navigate to="/login" />}
+      />
+      <Route
+        path="/database-connections"
+        element={isAuthenticated ? <DatabaseConnections /> : <Navigate to="/login" />}
       />
       <Route
         path="/settings"

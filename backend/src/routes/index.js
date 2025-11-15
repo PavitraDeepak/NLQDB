@@ -5,6 +5,7 @@ import schemaRoutes from './schemaRoutes.js';
 import organizationRoutes from './organizationRoutes.js';
 import billingRoutes from './billingRoutes.js';
 import apiKeyRoutes from './apiKeyRoutes.js';
+import databaseConnectionRoutes from './databaseConnectionRoutes.js';
 
 const router = express.Router();
 
@@ -22,6 +23,7 @@ router.use('/auth', authRoutes);
 router.use('/organizations', organizationRoutes);
 router.use('/billing', billingRoutes);
 router.use('/apikeys', apiKeyRoutes);
+router.use('/database-connections', databaseConnectionRoutes);
 router.use('/', queryRoutes); // Query routes at /api/translate, /api/execute, etc.
 router.use('/', schemaRoutes); // Schema routes at /api/schema, /api/tables, etc.
 

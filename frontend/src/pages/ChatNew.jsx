@@ -21,12 +21,18 @@ const Chat = () => {
   const fetchCollections = async () => {
     try {
       const data = await apiService.getCollections();
-      setCollections(data);
-      if (data.length > 0) {
-        setSelectedCollection(data[0].name);
+      console.log('Collections data:', data);
+      
+      // Ensure data is an array
+      const collectionsArray = Array.isArray(data) ? data : [];
+      setCollections(collectionsArray);
+      
+      if (collectionsArray.length > 0) {
+        setSelectedCollection(collectionsArray[0]); // collectionsArray[0] is a string
       }
     } catch (error) {
       console.error('Failed to fetch collections:', error);
+      setCollections([]); // Set empty array on error
     }
   };
 
@@ -101,8 +107,8 @@ const Chat = () => {
               >
                 <option value="">Select collection...</option>
                 {collections.map((col) => (
-                  <option key={col.name} value={col.name}>
-                    {col.name}
+                  <option key={col} value={col}>
+                    {col}
                   </option>
                 ))}
               </select>

@@ -6,6 +6,7 @@ import QueryResult from './QueryResult.js';
 import Organization from './Organization.js';
 import ApiKey from './ApiKey.js';
 import Subscription from './Subscription.js';
+import DatabaseConnection from './DatabaseConnection.js';
 
 export {
   User,
@@ -15,5 +16,6 @@ export {
   QueryResult,
   Organization,
   ApiKey,
-  Subscription
+  Subscription,
+  DatabaseConnection
 };

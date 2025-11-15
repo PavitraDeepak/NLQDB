@@ -29,6 +29,7 @@ const Sidebar = () => {
     { name: 'Chat', href: '/chat', icon: MessageSquare },
     { name: 'Tables', href: '/tables', icon: Database },
     { name: 'History', href: '/history', icon: History },
+    { name: 'Connections', href: '/database-connections', icon: Database },
     { name: 'API Keys', href: '/api-keys', icon: Key },
     { name: 'Billing', href: '/billing', icon: CreditCard },
     { name: 'Organization', href: '/organization', icon: Building2 },
