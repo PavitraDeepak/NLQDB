@@ -4,8 +4,7 @@ const auditQuerySchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: [true, 'User ID is required'],
-    index: true
+    required: [true, 'User ID is required']
   },
   userQuery: {
     type: String,
@@ -23,13 +22,11 @@ const auditQuerySchema = new mongoose.Schema({
   },
   collection: {
     type: String,
-    required: [true, 'Collection name is required'],
-    index: true
+    required: [true, 'Collection name is required']
   },
   executed: {
     type: Boolean,
-    default: false,
-    index: true
+    default: false
   },
   executionTime: {
     type: Number,
@@ -46,13 +43,11 @@ const auditQuerySchema = new mongoose.Schema({
   },
   timestamp: {
     type: Date,
-    default: Date.now,
-    index: true
+    default: Date.now
   },
   safetyPassed: {
     type: Boolean,
-    required: true,
-    index: true
+    required: true
   },
   safetyReason: {
     type: String,
@@ -79,7 +74,8 @@ const auditQuerySchema = new mongoose.Schema({
     default: null
   }
 }, {
-  timestamps: true
+  timestamps: true,
+  suppressReservedKeysWarning: true
 });
 
 // Compound indexes for common queries

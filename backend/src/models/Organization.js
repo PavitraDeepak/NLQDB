@@ -10,7 +10,6 @@ const organizationSchema = new mongoose.Schema({
   slug: {
     type: String,
     required: true,
-    unique: true,
     lowercase: true,
     trim: true
   },
@@ -132,7 +131,7 @@ const organizationSchema = new mongoose.Schema({
 });
 
 // Indexes
-organizationSchema.index({ slug: 1 });
+organizationSchema.index({ slug: 1 }, { unique: true });
 organizationSchema.index({ ownerUserId: 1 });
 organizationSchema.index({ stripeCustomerId: 1 }, { sparse: true });
 organizationSchema.index({ status: 1 });
