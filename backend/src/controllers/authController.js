@@ -52,10 +52,13 @@ export const register = asyncHandler(async (req, res) => {
 export const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
+  Logger.info('Login attempt', { email });
+
   // Find user and include password field
   const user = await User.findOne({ email }).select('+password');
 
   if (!user) {
+    Logger.warn('Login failed - user not found', { email });
     return res.status(401).json({
       success: false,
       error: 'Invalid credentials'
@@ -64,6 +67,7 @@ export const login = asyncHandler(async (req, res) => {
 
   // Check if user is active
   if (!user.isActive) {
+    Logger.warn('Login failed - inactive account', { email });
     return res.status(403).json({
       success: false,
       error: 'Account is inactive. Please contact administrator.'
@@ -74,6 +78,7 @@ export const login = asyncHandler(async (req, res) => {
   const isPasswordValid = await user.comparePassword(password);
 
   if (!isPasswordValid) {
+    Logger.warn('Login failed - invalid password', { email });
     return res.status(401).json({
       success: false,
       error: 'Invalid credentials'
@@ -91,12 +96,14 @@ export const login = asyncHandler(async (req, res) => {
     { expiresIn: process.env.JWT_EXPIRE || '7d' }
   );
 
-  Logger.info('User logged in', {
+  Logger.info('User logged in successfully', {
     userId: user._id,
-    email: user.email
+    email: user.email,
+    role: user.role,
+    tokenLength: token.length
   });
 
-  res.json({
+  const response = {
     success: true,
     message: 'Login successful',
     data: {
@@ -108,7 +115,14 @@ export const login = asyncHandler(async (req, res) => {
         role: user.role
       }
     }
+  };
+
+  Logger.info('Sending login response', { 
+    hasToken: !!response.data.token,
+    responseKeys: Object.keys(response)
   });
+
+  res.json(response);
 });
 
 /**
