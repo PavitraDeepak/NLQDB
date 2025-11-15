@@ -3,7 +3,10 @@ import { Organization, Subscription, User } from '../models/index.js';
 import { Logger } from '../middlewares/logger.js';
 import EmailService from './emailService.js';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+// Initialize Stripe only if API key is provided
+const stripe = process.env.STRIPE_SECRET_KEY 
+  ? new Stripe(process.env.STRIPE_SECRET_KEY)
+  : null;
 
 class BillingService {
   constructor() {

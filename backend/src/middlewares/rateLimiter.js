@@ -6,17 +6,34 @@ let redisClient = null;
 // Initialize Redis client if enabled
 if (process.env.REDIS_ENABLED === 'true' && process.env.REDIS_URL) {
   try {
-    redisClient = createClient({
-      url: process.env.REDIS_URL
-    });
+    // Support both redis:// and rediss:// (TLS) for cloud providers
+    const redisUrl = process.env.REDIS_URL;
+    const useTLS = redisUrl.startsWith('rediss://');
+    
+    const redisConfig = {
+      url: redisUrl
+    };
+    
+    // Add TLS configuration for secure connections (Upstash, etc.)
+    if (useTLS) {
+      redisConfig.socket = {
+        tls: true,
+        rejectUnauthorized: false // For cloud providers with self-signed certs
+      };
+    }
+    
+    redisClient = createClient(redisConfig);
 
     redisClient.on('error', (err) => {
       console.error('Redis Client Error:', err);
       redisClient = null;
     });
+    
+    redisClient.on('ready', () => {
+      console.log('Redis connected successfully for rate limiting');
+    });
 
     await redisClient.connect();
-    console.log('Redis connected for rate limiting');
   } catch (error) {
     console.error('Failed to connect to Redis:', error);
     redisClient = null;
