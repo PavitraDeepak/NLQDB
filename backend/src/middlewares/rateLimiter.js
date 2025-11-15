@@ -91,7 +91,7 @@ export const apiLimiter = rateLimit({
 // Strict rate limiter for authentication endpoints
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // 5 requests per window
+  max: process.env.NODE_ENV === 'development' ? 50 : 5, // Higher limit in dev
   skipSuccessfulRequests: true,
   message: {
     success: false,
