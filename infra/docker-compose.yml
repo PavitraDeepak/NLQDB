@@ -25,11 +25,14 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
+    environment:
+      - VITE_API_URL=https://symmetrical-spoon-69vq4746p7pq2rqqg-5000.app.github.dev/api
     depends_on:
       - backend
     volumes:
       - ../frontend/src:/app/src
       - ../frontend/public:/app/public
+      - ../frontend/.env:/app/.env
     networks:
       - nlqdb-network
 
