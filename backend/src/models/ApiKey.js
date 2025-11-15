@@ -21,9 +21,7 @@ const apiKeySchema = new mongoose.Schema({
   },
   key: {
     type: String,
-    required: true,
-    unique: true,
-    index: true
+    required: true
   },
   keyPrefix: {
     type: String,

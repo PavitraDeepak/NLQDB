@@ -20,7 +20,6 @@ const subscriptionSchema = new mongoose.Schema({
   // Stripe data
   stripeSubscriptionId: {
     type: String,
-    unique: true,
     sparse: true
   },
   stripePriceId: {
