@@ -39,13 +39,16 @@ const Signup = () => {
     setLoading(true);
 
     try {
-      await apiService.register({
+      const response = await apiService.register({
         name: formData.name,
         email: formData.email,
         password: formData.password,
       });
-      navigate('/onboarding');
+      console.log('Signup response:', response);
+      // Registration successful, redirect to login
+      navigate('/login', { state: { message: 'Account created successfully. Please log in.' } });
     } catch (err) {
+      console.error('Signup error:', err);
       setError(err.message || 'Failed to create account');
     } finally {
       setLoading(false);

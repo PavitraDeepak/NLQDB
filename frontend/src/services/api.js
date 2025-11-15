@@ -31,6 +31,10 @@ api.interceptors.response.use(
       // Token expired or invalid
       localStorage.removeItem('token');
       localStorage.removeItem('user');
+      
+      // Trigger auth change event
+      window.dispatchEvent(new Event('authChange'));
+      
       window.location.href = '/login';
     }
     return Promise.reject(error);

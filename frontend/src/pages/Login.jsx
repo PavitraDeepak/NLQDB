@@ -18,9 +18,22 @@ const Login = () => {
     
     try {
       const response = await apiService.login({ email, password });
-      localStorage.setItem('token', response.token);
-      navigate('/dashboard');
+      console.log('Login response:', response);
+      
+      if (response.data && response.data.token) {
+        localStorage.setItem('token', response.data.token);
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+        console.log('Token stored, navigating to dashboard');
+        
+        // Trigger auth change event for App.jsx to detect
+        window.dispatchEvent(new Event('authChange'));
+        
+        navigate('/dashboard');
+      } else {
+        setError('Invalid response format from server');
+      }
     } catch (err) {
+      console.error('Login error:', err);
       setError(err.message || 'Invalid credentials');
     } finally {
       setLoading(false);

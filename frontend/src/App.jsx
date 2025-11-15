@@ -14,11 +14,28 @@ import StyleGuide from './pages/StyleGuide';
 
 function App() {
   const [loading, setLoading] = useState(true);
-  const isAuthenticated = !!localStorage.getItem('token');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    // Quick auth check
-    setLoading(false);
+    // Check authentication on mount and storage changes
+    const checkAuth = () => {
+      const token = localStorage.getItem('token');
+      setIsAuthenticated(!!token);
+      setLoading(false);
+    };
+
+    checkAuth();
+
+    // Listen for storage events (when localStorage changes in other tabs)
+    window.addEventListener('storage', checkAuth);
+    
+    // Custom event for same-tab localStorage changes
+    window.addEventListener('authChange', checkAuth);
+
+    return () => {
+      window.removeEventListener('storage', checkAuth);
+      window.removeEventListener('authChange', checkAuth);
+    };
   }, []);
 
   if (loading) {
