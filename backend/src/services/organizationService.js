@@ -169,22 +169,21 @@ class OrganizationService {
         user.invitedAt = new Date();
         await user.save();
       } else {
-        // Create new user (pending)
-        const tempPassword = crypto.randomBytes(16).toString('hex');
-        const verificationToken = crypto.randomBytes(32).toString('hex');
+        // Create new user with default password
+        const defaultPassword = '11111111'; // Default password for all invited users
 
         user = new User({
           name: name || email.split('@')[0],
           email,
-          password: tempPassword,
+          password: defaultPassword,
           organizationId,
           organizationRole: role,
           role: 'viewer',
           invitedBy: inviterUserId,
           invitedAt: new Date(),
-          emailVerificationToken: verificationToken,
-          emailVerified: false,
-          isActive: false
+          emailVerified: true, // Auto-verify invited users
+          isActive: true, // Make them active immediately
+          requirePasswordChange: true // Force password change on first login
         });
 
         await user.save();

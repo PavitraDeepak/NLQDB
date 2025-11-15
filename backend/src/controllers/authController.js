@@ -152,7 +152,8 @@ export const login = asyncHandler(async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
-        role: user.role
+        role: user.role,
+        requirePasswordChange: user.requirePasswordChange || false
       }
     }
   };
@@ -193,5 +194,65 @@ export const updateProfile = asyncHandler(async (req, res) => {
     success: true,
     message: 'Profile updated successfully',
     data: user
+  });
+});
+
+/**
+ * Change password
+ * POST /api/auth/change-password
+ */
+export const changePassword = asyncHandler(async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+
+  if (!newPassword || newPassword.length < 8) {
+    return res.status(400).json({
+      success: false,
+      error: 'New password must be at least 8 characters long'
+    });
+  }
+
+  // Get user with password
+  const user = await User.findById(req.user._id).select('+password');
+
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      error: 'User not found'
+    });
+  }
+
+  // For users who need to change password (invited users), skip current password check
+  if (!user.requirePasswordChange) {
+    // Verify current password for normal password changes
+    if (!currentPassword) {
+      return res.status(400).json({
+        success: false,
+        error: 'Current password is required'
+      });
+    }
+
+    const isPasswordValid = await user.comparePassword(currentPassword);
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        success: false,
+        error: 'Current password is incorrect'
+      });
+    }
+  }
+
+  // Update password and remove password change requirement
+  user.password = newPassword;
+  user.requirePasswordChange = false;
+  await user.save();
+
+  Logger.info('Password changed successfully', {
+    userId: user._id,
+    email: user.email,
+    wasForced: user.requirePasswordChange
+  });
+
+  res.json({
+    success: true,
+    message: 'Password changed successfully'
   });
 });

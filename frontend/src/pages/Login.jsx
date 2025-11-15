@@ -3,12 +3,14 @@ import { useNavigate, Link } from 'react-router-dom';
 import apiService from '../services/apiService';
 import Input from '../components/Input';
 import Button from '../components/Button';
+import ChangePasswordModal from '../components/ChangePasswordModal';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPasswordChange, setShowPasswordChange] = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -23,12 +25,17 @@ const Login = () => {
       if (response.data && response.data.token) {
         localStorage.setItem('token', response.data.token);
         localStorage.setItem('user', JSON.stringify(response.data.user));
-        console.log('Token stored, navigating to dashboard');
+        console.log('Token stored');
         
-        // Trigger auth change event for App.jsx to detect
-        window.dispatchEvent(new Event('authChange'));
-        
-        navigate('/dashboard');
+        // Check if password change is required
+        if (response.data.user && response.data.user.requirePasswordChange) {
+          console.log('Password change required');
+          setShowPasswordChange(true);
+        } else {
+          // Trigger auth change event for App.jsx to detect
+          window.dispatchEvent(new Event('authChange'));
+          navigate('/dashboard');
+        }
       } else {
         setError('Invalid response format from server');
       }
@@ -38,6 +45,22 @@ const Login = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handlePasswordChangeSuccess = () => {
+    console.log('Password changed successfully, redirecting to dashboard');
+    setShowPasswordChange(false);
+    
+    // Update user object to reflect password has been changed
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (user) {
+      user.requirePasswordChange = false;
+      localStorage.setItem('user', JSON.stringify(user));
+    }
+    
+    // Trigger auth change event and navigate
+    window.dispatchEvent(new Event('authChange'));
+    navigate('/dashboard');
   };
 
   return (
@@ -125,6 +148,14 @@ const Login = () => {
           © 2025 NLQDB. All rights reserved.
         </p>
       </div>
+
+      {/* Password Change Modal */}
+      <ChangePasswordModal
+        isOpen={showPasswordChange}
+        onClose={() => {}}
+        isRequired={true}
+        onSuccess={handlePasswordChangeSuccess}
+      />
     </div>
   );
 };

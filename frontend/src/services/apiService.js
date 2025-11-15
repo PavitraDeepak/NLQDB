@@ -16,6 +16,14 @@ const apiService = {
     localStorage.removeItem('token');
   },
 
+  changePassword: async (currentPassword, newPassword) => {
+    const response = await api.post('/auth/change-password', {
+      currentPassword,
+      newPassword
+    });
+    return response.data;
+  },
+
   // Organizations
   getCurrentOrganization: async () => {
     const response = await api.get('/organizations/current');

@@ -78,6 +78,10 @@ const userSchema = new mongoose.Schema({
   },
   invitedAt: Date,
   acceptedAt: Date,
+  requirePasswordChange: {
+    type: Boolean,
+    default: false
+  },
   lastLogin: {
     type: Date,
     default: null
