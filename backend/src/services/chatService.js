@@ -152,12 +152,24 @@ ${schemaDescription}
 8. ⚠️  Field names must exactly match the schema above
 
 === QUERY TRANSLATION GUIDELINES ===
-- Use the EXACT column/field names from the schema
+- Use the EXACT column/field names from the schema above - DO NOT assume or invent field names
+- If a field is not in the schema but similar fields exist, use the closest match
+- For MongoDB: Use simple, flat field paths unless schema explicitly shows nested objects
 - For aggregations (count, sum, avg), use appropriate SQL/MongoDB functions
+- When working with arrays: only use $unwind if the schema shows an array field
+- For "items" or "products" queries: look for fields like item_name, product_id, quantity, etc.
+- For revenue/total calculations: use fields like amount, price, total, revenue (exact names from schema)
 - For date ranges, use BETWEEN or $gte/$lte operators
 - For text search, use LIKE (SQL) or $regex (MongoDB) with case-insensitive flag
 - For sorting, always specify ASC or DESC explicitly
 - Consider indexes when suggesting complex queries
+
+=== IMPORTANT: SCHEMA ADHERENCE ===
+- NEVER assume nested object structures unless explicitly shown in schema
+- NEVER use $objectToArray unless you see a map/object type in the schema
+- If you need to access multiple records for aggregation, use the actual fields shown
+- When in doubt, query for all documents first (with $limit) to show available data
+- If requested fields don't exist, mark safety as "warning" (not "unsafe") and include warningMessage explaining which fields are missing
 
 === RESPONSE FORMAT ===
 Return ONLY valid JSON (no markdown, no code blocks, no extra text):
@@ -244,6 +256,26 @@ Response: {
   "estimatedCost": 0.3,
   "safety": "safe"
 }`);
+
+      // Add revenue/aggregation example if relevant fields exist
+      const hasAmount = schema.some(col => ['amount', 'price', 'total', 'revenue'].includes(col.name?.toLowerCase()));
+      const hasItem = schema.some(col => ['item', 'product', 'name', 'item_name', 'product_name'].includes(col.name?.toLowerCase()));
+      
+      if (hasAmount && hasItem) {
+        examples.push(`User: "Which items generate the most revenue?"
+Response: {
+  "mongoQuery": [
+    { "$group": { "_id": "$item_name", "totalRevenue": { "$sum": "$amount" } } },
+    { "$sort": { "totalRevenue": -1 } },
+    { "$limit": 100 }
+  ],
+  "collection": "${tableName}",
+  "explain": "Groups by item name and sums revenue, sorted by highest revenue first",
+  "requiresIndexes": ["item_name", "amount"],
+  "estimatedCost": 0.6,
+  "safety": "safe"
+}`);
+      }
 
       return examples.join('\n\n');
     } else {
@@ -585,7 +617,7 @@ Response: {
         throw new Error('Query signature verification failed - possible tampering detected');
       }
 
-      // Check if translation is marked unsafe
+      // Check if translation is marked unsafe (warnings are allowed)
       if (translation.safety === 'unsafe') {
         throw new Error(`Query execution denied: ${translation.warningMessage || 'Unsafe operation detected'}`);
       }

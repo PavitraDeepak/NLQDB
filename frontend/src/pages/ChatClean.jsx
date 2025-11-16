@@ -80,22 +80,36 @@ const Chat = () => {
       const firstResult = result.results[0];
       const keys = Object.keys(firstResult);
       
-      // Check for count/aggregate results (MongoDB $count returns {fieldName: count})
-      if (keys.length === 1 && typeof firstResult[keys[0]] === 'number') {
-        const countValue = firstResult[keys[0]];
-        return `The ${keys[0].replace(/([A-Z])/g, ' $1').toLowerCase().trim()} is ${countValue.toLocaleString()}.`;
+      // Check for aggregation results with common patterns
+      if (keys.length <= 2) {
+        for (const key of keys) {
+          const value = firstResult[key];
+          if (typeof value === 'number' && key !== '_id') {
+            // Determine what type of aggregation based on key name
+            if (key.toLowerCase().includes('average') || key.toLowerCase().includes('avg')) {
+              return `The average ${key.replace(/average|avg/gi, '').replace(/([A-Z])/g, ' $1').toLowerCase().trim()} is ${value.toLocaleString()}.`;
+            }
+            if (key.toLowerCase().includes('total') || key.toLowerCase().includes('sum')) {
+              return `The total ${key.replace(/total|sum/gi, '').replace(/([A-Z])/g, ' $1').toLowerCase().trim()} is ${value.toLocaleString()}.`;
+            }
+            if (key.toLowerCase().includes('count')) {
+              return `The count is ${value.toLocaleString()}.`;
+            }
+            if (key.toLowerCase().includes('min') || key.toLowerCase().includes('minimum')) {
+              return `The minimum ${key.replace(/min|minimum/gi, '').replace(/([A-Z])/g, ' $1').toLowerCase().trim()} is ${value.toLocaleString()}.`;
+            }
+            if (key.toLowerCase().includes('max') || key.toLowerCase().includes('maximum')) {
+              return `The maximum ${key.replace(/max|maximum/gi, '').replace(/([A-Z])/g, ' $1').toLowerCase().trim()} is ${value.toLocaleString()}.`;
+            }
+            // Generic numeric result
+            return `The ${key.replace(/([A-Z])/g, ' $1').toLowerCase().trim()} is ${value.toLocaleString()}.`;
+          }
+        }
       }
       
       // Check for specific aggregate fields
       if (keys.includes('totalRevenue')) {
         return `The total revenue is $${firstResult.totalRevenue.toLocaleString()}.`;
-      }
-      if (keys.includes('total')) {
-        return `The total is ${firstResult.total.toLocaleString()}.`;
-      }
-      if (keys.includes('count') || keys.includes('_count')) {
-        const count = firstResult.count || firstResult._count;
-        return `The count is ${count.toLocaleString()}.`;
       }
     }
 
@@ -129,9 +143,9 @@ const Chat = () => {
     setLoading(true);
 
     try {
-      // Stage 1: Building query
+      // Stage 1: Analyzing query
       setExecutionStages([
-        { label: 'Building query...', status: 'loading' }
+        { label: 'Analyzing query...', status: 'loading' }
       ]);
 
       // Translate query
@@ -143,18 +157,18 @@ const Chat = () => {
       const translation = translationResponse.data; // Unwrap response
       setCurrentTranslation(translation);
 
-      // Stage 2: Validating
+      // Stage 2: Generating code
       setExecutionStages([
-        { label: 'Building query...', status: 'completed' },
-        { label: 'Validating...', status: 'loading' }
+        { label: 'Analyzing query...', status: 'completed' },
+        { label: 'Generating code...', status: 'loading' }
       ]);
 
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 300));
 
       // Stage 3: Executing
       setExecutionStages([
-        { label: 'Building query...', status: 'completed' },
-        { label: 'Validating...', status: 'completed' },
+        { label: 'Analyzing query...', status: 'completed' },
+        { label: 'Generating code...', status: 'completed' },
         { label: 'Executing...', status: 'loading' }
       ]);
 
@@ -176,8 +190,8 @@ const Chat = () => {
       const result = executeResponse.data; // Unwrap response
 
       setExecutionStages([
-        { label: 'Building query...', status: 'completed' },
-        { label: 'Validating...', status: 'completed' },
+        { label: 'Analyzing query...', status: 'completed' },
+        { label: 'Generating code...', status: 'completed' },
         { label: 'Executing...', status: 'completed' }
       ]);
 

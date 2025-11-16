@@ -213,14 +213,22 @@ class SchemaAggregationService {
     }
 
     // 3. Field name matches (very important)
+    let fieldMatchCount = 0;
     for (const field of fieldCandidates) {
       if (columnSet.has(field)) {
         score += 8;
+        fieldMatchCount++;
       } else if (columnNames.some(col => col.includes(field))) {
         score += 4;
+        fieldMatchCount++;
       } else if (columnNames.some(col => field.includes(col))) {
         score += 2;
       }
+    }
+    
+    // Bonus for tables with multiple matching fields (indicates strong relevance)
+    if (fieldMatchCount >= 2) {
+      score += 10 * fieldMatchCount; // Strong boost for multi-field matches
     }
 
     // 4. Keyword relevance (common business terms)
@@ -266,10 +274,12 @@ class SchemaAggregationService {
   _extractFieldCandidates(query) {
     const fields = new Set();
     
-    // Common field patterns
+    // Common field patterns - expanded to catch more domain-specific terms
     const patterns = [
       /\b(id|name|email|status|price|amount|total|count|date|time|created|updated|deleted)\b/gi,
-      /\b(user|customer|order|product|transaction|payment|invoice|address)\b/gi,
+      /\b(user|customer|order|product|transaction|payment|invoice|address|restaurant|venue|store)\b/gi,
+      /\b(rating|review|feedback|comment|score|stars|rank)\b/gi,
+      /\b(quantity|qty|items|description|notes|title|category|type)\b/gi,
       /\b(\w+_id|\w+_name|\w+_at|\w+_by)\b/gi
     ];
 
@@ -280,13 +290,35 @@ class SchemaAggregationService {
       }
     }
 
+    // Extract nouns and potential field names (words that might be column names)
+    // Look for words between "of", "the", "in", "for", etc.
+    const nounPatterns = [
+      /(?:average|total|sum|count|number|list|show|get|find|fetch)\s+(?:of\s+)?(?:the\s+)?(\w+)/gi,
+      /(\w+)\s+(?:of|in|from|for)\s+(?:the\s+)?(\w+)/gi,
+    ];
+
+    for (const pattern of nounPatterns) {
+      const matches = [...query.matchAll(pattern)];
+      matches.forEach(match => {
+        // Add both captured groups as potential fields
+        for (let i = 1; i < match.length; i++) {
+          if (match[i]) {
+            fields.add(match[i].toLowerCase());
+          }
+        }
+      });
+    }
+
     // Semantic field mapping - domain-specific synonyms
     const semanticMappings = {
       'revenue': ['price', 'amount', 'total', 'mrr', 'arr', 'subscription', 'plan'],
       'income': ['price', 'amount', 'total', 'revenue', 'earnings'],
       'sales': ['order', 'transaction', 'purchase', 'total', 'amount'],
       'users': ['customer', 'account', 'profile', 'member'],
-      'transactions': ['order', 'payment', 'purchase', 'invoice']
+      'transactions': ['order', 'payment', 'purchase', 'invoice'],
+      'rating': ['rating', 'score', 'stars', 'review', 'feedback'],
+      'reviews': ['review', 'rating', 'comment', 'feedback', 'score'],
+      'restaurant': ['restaurant', 'venue', 'store', 'shop', 'location']
     };
 
     // Apply semantic mappings
