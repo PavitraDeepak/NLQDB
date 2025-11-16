@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 import { Logger } from '../middlewares/logger.js';
 
 class LLMService {
@@ -11,8 +11,8 @@ class LLMService {
     if (!apiKey) {
       Logger.warn('GOOGLE_AI_API_KEY not set, LLM features will be unavailable');
     } else {
-      this.googleAI = new GoogleGenerativeAI(apiKey);
-      this.model = process.env.LLM_MODEL || 'gemini-pro';
+      this.googleClient = new GoogleGenAI({ apiKey });
+      this.model = process.env.LLM_MODEL || 'gemini-2.5-flash';
       Logger.info('LLM Service initialized with Google AI', { model: this.model });
     }
   }
@@ -103,19 +103,29 @@ Context: ${JSON.stringify(context)}
 Generate MongoDB query following the constraints above.`;
 
       // Google AI (Gemini)
-      const model = this.googleAI.getGenerativeModel({ model: this.model });
       const fullPrompt = systemPrompt + '\n\n' + userPrompt;
-      
-      const result = await model.generateContent({
+
+      const result = await this.googleClient.models.generateContent({
+        model: this.model,
         contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
         generationConfig: {
           temperature: this.temperature,
           maxOutputTokens: this.maxTokens,
         }
       });
-      
-      const responseText = result.response.text();
-      const tokensUsed = result.response.usageMetadata?.totalTokenCount || 0;
+
+      let responseText = result?.response?.text ?? result?.text ?? '';
+      if (!responseText && result?.response?.candidates?.length) {
+        const candidate = result.response.candidates[0];
+        const partWithText = candidate?.content?.parts?.find(part => part.text);
+        if (partWithText?.text) {
+          responseText = partWithText.text;
+        }
+      }
+      if (!responseText) {
+        throw new Error('Empty response received from Google AI');
+      }
+      const tokensUsed = result?.response?.usageMetadata?.totalTokenCount || 0;
 
       Logger.debug('LLM raw response', { responseText });
 

@@ -8,6 +8,7 @@ import apiKeyService from './apiKeyService.js';
 import usageService from './usageService.js';
 import planService from './planService.js';
 import emailService from './emailService.js';
+import chatService from './chatService.js';
 
 export {
   llmService,
@@ -19,5 +20,6 @@ export {
   apiKeyService,
   usageService,
   planService,
-  emailService
+  emailService,
+  chatService
 };

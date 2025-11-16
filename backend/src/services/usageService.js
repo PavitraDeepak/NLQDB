@@ -320,6 +320,55 @@ class UsageService {
       Logger.error('Failed to check usage alerts', error);
     }
   }
+
+  /**
+   * Record query translation (for chat service)
+   */
+  async recordQueryTranslation(organizationId, userId, tokensUsed = 0) {
+    try {
+      const organization = await Organization.findById(organizationId);
+      if (!organization) {
+        return;
+      }
+
+      await organization.incrementUsage({
+        queries: 1,
+        tokens: tokensUsed
+      });
+
+      Logger.debug('Query translation recorded', {
+        organizationId,
+        userId,
+        tokensUsed
+      });
+    } catch (error) {
+      Logger.error('Failed to record query translation', error);
+    }
+  }
+
+  /**
+   * Record query execution (for chat service)
+   */
+  async recordQueryExecution(organizationId, userId, rowCount = 0) {
+    try {
+      const organization = await Organization.findById(organizationId);
+      if (!organization) {
+        return;
+      }
+
+      await organization.incrementUsage({
+        queries: 1
+      });
+
+      Logger.debug('Query execution recorded', {
+        organizationId,
+        userId,
+        rowCount
+      });
+    } catch (error) {
+      Logger.error('Failed to record query execution', error);
+    }
+  }
 }
 
 export default new UsageService();

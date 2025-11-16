@@ -263,7 +263,8 @@ databaseConnectionSchema.methods.getConnectionString = function() {
 
 databaseConnectionSchema.methods.getSafeInfo = function() {
   const info = {
-    id: this._id,
+    _id: this._id,  // Include MongoDB _id
+    id: this._id,   // Also include id for convenience
     name: this.name,
     type: this.type,
     connectionMethod: this.connectionMethod,

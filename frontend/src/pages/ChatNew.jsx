@@ -11,33 +11,35 @@ const Chat = () => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [collections, setCollections] = useState([]);
-  const [selectedCollection, setSelectedCollection] = useState('');
+  const [connections, setConnections] = useState([]);
+  const [selectedConnection, setSelectedConnection] = useState('');
 
   useEffect(() => {
-    fetchCollections();
+    fetchConnections();
   }, []);
 
-  const fetchCollections = async () => {
+  const fetchConnections = async () => {
     try {
-      const data = await apiService.getCollections();
-      console.log('Collections data:', data);
+      const data = await apiService.getDatabaseConnections();
+      console.log('Database connections:', data);
       
       // Ensure data is an array
-      const collectionsArray = Array.isArray(data) ? data : [];
-      setCollections(collectionsArray);
+      const connectionsArray = Array.isArray(data) ? data : [];
+      setConnections(connectionsArray);
       
-      if (collectionsArray.length > 0) {
-        setSelectedCollection(collectionsArray[0]); // collectionsArray[0] is a string
+      if (connectionsArray.length > 0) {
+        const firstConnectionId = connectionsArray[0]._id;
+        console.log('Setting selected connection to:', firstConnectionId);
+        setSelectedConnection(firstConnectionId); // Use connection _id
       }
     } catch (error) {
-      console.error('Failed to fetch collections:', error);
-      setCollections([]); // Set empty array on error
+      console.error('Failed to fetch database connections:', error);
+      setConnections([]); // Set empty array on error
     }
   };
 
   const handleSend = async () => {
-    if (!input.trim() || !selectedCollection) return;
+    if (!input.trim() || !selectedConnection) return;
 
     const userMessage = {
       id: Date.now(),
@@ -51,17 +53,25 @@ const Chat = () => {
     setLoading(true);
 
     try {
+      console.log('Sending translation request with connectionId:', selectedConnection);
       const response = await apiService.translateQuery({
         query: input,
-        collection: selectedCollection,
+        connectionId: selectedConnection,
       });
+      const translation = response?.data || response;
+      const queryPayload = translation?.query || translation?.mongoQuery || translation?.sqlQuery;
+      const formattedQuery = typeof queryPayload === 'string'
+        ? queryPayload
+        : JSON.stringify(queryPayload, null, 2);
 
       const aiMessage = {
         id: Date.now() + 1,
         role: 'assistant',
-        content: response.mongoQuery,
-        explanation: response.explanation,
-        results: response.results,
+        content: formattedQuery || 'No query generated',
+        explanation: translation?.explain,
+        safety: translation?.safety,
+        warningMessage: translation?.warningMessage,
+        results: translation?.preview?.rows || translation?.results,
         timestamp: new Date(),
       };
 
@@ -101,14 +111,17 @@ const Chat = () => {
             </div>
             <div className="w-64">
               <select
-                value={selectedCollection}
-                onChange={(e) => setSelectedCollection(e.target.value)}
+                value={selectedConnection}
+                onChange={(e) => {
+                  console.log('Connection changed to:', e.target.value);
+                  setSelectedConnection(e.target.value);
+                }}
                 className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-black focus:border-black"
               >
-                <option value="">Select collection...</option>
-                {collections.map((col) => (
-                  <option key={col} value={col}>
-                    {col}
+                <option key="empty" value="">Select database...</option>
+                {connections.map((conn) => (
+                  <option key={conn._id} value={conn._id}>
+                    {conn.name}
                   </option>
                 ))}
               </select>
@@ -211,11 +224,11 @@ const Chat = () => {
                   onChange={(e) => setInput(e.target.value)}
                   onKeyPress={handleKeyPress}
                   placeholder={
-                    selectedCollection
-                      ? `Ask a question about ${selectedCollection}...`
-                      : 'Select a collection first...'
+                    selectedConnection
+                      ? `Ask a question about your database...`
+                      : 'Select a database connection first...'
                   }
-                  disabled={!selectedCollection || loading}
+                  disabled={!selectedConnection || loading}
                   rows={1}
                   className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-sm resize-none focus:ring-2 focus:ring-black focus:border-black disabled:bg-gray-50 disabled:text-gray-500"
                   style={{ minHeight: '48px', maxHeight: '120px' }}
@@ -223,7 +236,7 @@ const Chat = () => {
               </div>
               <Button
                 onClick={handleSend}
-                disabled={!input.trim() || !selectedCollection || loading}
+                disabled={!input.trim() || !selectedConnection || loading}
                 variant="primary"
                 className="px-4 py-3"
               >

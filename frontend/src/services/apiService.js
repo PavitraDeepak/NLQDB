@@ -97,17 +97,7 @@ const apiService = {
     return response.data.data || response.data;
   },
 
-  // Queries
-  translateQuery: async (data) => {
-    const response = await api.post('/query/translate', data);
-    return response.data.data || response.data;
-  },
-
-  executeQuery: async (data) => {
-    const response = await api.post('/query/execute', data);
-    return response.data.data || response.data;
-  },
-
+  // Queries (Legacy - kept for backward compatibility)
   getQueryHistory: async () => {
     const response = await api.get('/query/history');
     return response.data.data || response.data;
@@ -174,6 +164,57 @@ const apiService = {
   rotateDatabaseCredentials: async (id, newPassword) => {
     const response = await api.post(`/database-connections/${id}/rotate`, { newPassword });
     return response.data.data || response.data;
+  },
+
+  // Chat - Natural Language Query Interface
+  translateQuery: async (data) => {
+    const response = await api.post('/chat/translate', data);
+    return response.data;
+  },
+
+  executeQuery: async (data) => {
+    const response = await api.post('/chat/execute', data);
+    return response.data;
+  },
+
+  getQueryResult: async (executionId) => {
+    const response = await api.get(`/chat/result/${executionId}`);
+    return response.data;
+  },
+
+  getChatHistory: async (params = {}) => {
+    const response = await api.get('/chat/history', { params });
+    return response.data;
+  },
+
+  clarifyQuery: async (data) => {
+    const response = await api.post('/chat/clarify', data);
+    return response.data;
+  },
+
+  cancelQuery: async (executionId) => {
+    const response = await api.post('/chat/cancel', { executionId });
+    return response.data;
+  },
+
+  explainQuery: async (data) => {
+    const response = await api.post('/chat/explain', data);
+    return response.data;
+  },
+
+  previewQuery: async (data) => {
+    const response = await api.post('/chat/preview', data);
+    return response.data;
+  },
+
+  replayQuery: async (data) => {
+    const response = await api.post('/chat/replay', data);
+    return response.data;
+  },
+
+  getCostEstimate: async (data) => {
+    const response = await api.post('/chat/estimate', data);
+    return response.data;
   },
 };
 
