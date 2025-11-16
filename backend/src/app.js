@@ -1,9 +1,9 @@
-import express from 'express';
-import dotenv from 'dotenv';
-import cors from 'cors';
-import helmet from 'helmet';
-import { connectDB } from './utils/database.js';
-import routes from './routes/index.js';
+import express from "express";
+import dotenv from "dotenv";
+import cors from "cors";
+import helmet from "helmet";
+import { connectDB } from "./utils/database.js";
+import routes from "./routes/index.js";
 import {
   devLogger,
   prodLogger,
@@ -13,8 +13,8 @@ import {
   notFoundHandler,
   apiLimiter,
   sanitizeQuery,
-  preventNoSQLInjection
-} from './middlewares/index.js';
+  preventNoSQLInjection,
+} from "./middlewares/index.js";
 
 // Load environment variables
 dotenv.config();
@@ -31,39 +31,37 @@ app.use(helmet());
 // CORS configuration
 const corsOptions = {
   origin: function (origin, callback) {
-    const allowedOrigins = [
-      'https://symmetrical-spoon-69vq4746p7pq2rqqg-3000.app.github.dev',
-      'http://localhost:3000',
-      process.env.CORS_ORIGIN
-    ].filter(Boolean);
-    
+    const allowedOrigins = process.env.CORS_ALLOWED_ORIGINS
+      ? process.env.CORS_ALLOWED_ORIGINS.split(",").map((url) => url.trim())
+      : [];
+
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.indexOf(origin) !== -1 || process.env.CORS_ORIGIN === '*') {
+
+    if (allowedOrigins.includes(origin) || process.env.CORS_ORIGIN === "*") {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      callback(new Error("Not allowed by CORS"));
     }
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  exposedHeaders: ['Content-Range', 'X-Content-Range'],
-  maxAge: 600
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+  exposedHeaders: ["Content-Range", "X-Content-Range"],
+  maxAge: 600,
 };
 
 app.use(cors(corsOptions));
 
 // Handle preflight requests
-app.options('*', cors(corsOptions));
+app.options("*", cors(corsOptions));
 
 // Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // Logging middleware
-if (process.env.NODE_ENV === 'development') {
+if (process.env.NODE_ENV === "development") {
   app.use(devLogger);
 } else {
   app.use(prodLogger);
@@ -76,26 +74,26 @@ app.use(sanitizeQuery);
 app.use(preventNoSQLInjection);
 
 // Rate limiting
-app.use('/api', apiLimiter);
+app.use("/api", apiLimiter);
 
 // API Routes
-app.use('/api', routes);
+app.use("/api", routes);
 
 // Root endpoint
-app.get('/', (req, res) => {
+app.get("/", (req, res) => {
   res.json({
     success: true,
-    message: 'NLQDB API Server',
-    version: '1.0.0',
+    message: "NLQDB API Server",
+    version: "1.0.0",
     endpoints: {
-      health: '/api/health',
-      auth: '/api/auth/*',
-      schema: '/api/schema',
-      tables: '/api/tables',
-      translate: '/api/translate',
-      execute: '/api/execute',
-      history: '/api/history'
-    }
+      health: "/api/health",
+      auth: "/api/auth/*",
+      schema: "/api/schema",
+      tables: "/api/tables",
+      translate: "/api/translate",
+      execute: "/api/execute",
+      history: "/api/history",
+    },
   });
 });
 
@@ -111,7 +109,9 @@ const server = app.listen(PORT, () => {
   console.log(`
   ╔═══════════════════════════════════════╗
   ║   NLQDB API Server Running            ║
-  ║   Environment: ${process.env.NODE_ENV?.padEnd(23) || 'development'.padEnd(23)}║
+  ║   Environment: ${
+    process.env.NODE_ENV?.padEnd(23) || "development".padEnd(23)
+  }║
   ║   Port: ${PORT.toString().padEnd(30)}║
   ║   URL: http://localhost:${PORT.toString().padEnd(17)}║
   ╚═══════════════════════════════════════╝
@@ -119,10 +119,10 @@ const server = app.listen(PORT, () => {
 });
 
 // Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received, shutting down gracefully');
+process.on("SIGTERM", () => {
+  console.log("SIGTERM received, shutting down gracefully");
   server.close(() => {
-    console.log('Server closed');
+    console.log("Server closed");
     process.exit(0);
   });
 });
