@@ -26,6 +26,7 @@ const Chat = () => {
   const [executionError, setExecutionError] = useState(null);
   const [chatHistory, setChatHistory] = useState([]);
   const [currentChatId, setCurrentChatId] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
@@ -326,17 +327,9 @@ const Chat = () => {
 
   return (
     <DashboardLayout>
-      <div className="h-screen flex bg-gray-50">
-        {/* Sidebar */}
-        <ChatSidebar
-          chatHistory={chatHistory}
-          currentChatId={currentChatId}
-          onSelectChat={handleSelectChat}
-          onDeleteChat={handleDeleteChat}
-        />
-
+      <div className="h-full flex relative">
         {/* Main Chat Area */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col bg-gray-50 min-w-0">
           {/* Header */}
           <ChatHeader
             currentChat={currentChat || { 
@@ -345,23 +338,26 @@ const Chat = () => {
             }}
             onNewChat={handleNewChat}
             onSettings={() => {}}
+            onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+            showSidebarToggle={true}
+            sidebarPosition="right"
           />
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto px-6 py-6">
-            <div className="max-w-4xl mx-auto">
+          <div className="flex-1 overflow-y-auto px-3 sm:px-4 md:px-6 py-4 md:py-6">
+            <div className="max-w-3xl w-full mx-auto">
               {messages.length === 0 ? (
-                <div className="h-full flex items-center justify-center">
-                  <div className="text-center max-w-md">
-                    <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <svg className="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="h-full flex items-center justify-center px-4">
+                  <div className="text-center max-w-md w-full">
+                    <div className="w-12 h-12 sm:w-16 sm:h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
+                      <svg className="w-6 h-6 sm:w-8 sm:h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
                       </svg>
                     </div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">
                       Start a conversation
                     </h3>
-                    <p className="text-sm text-gray-600 mb-6">
+                    <p className="text-xs sm:text-sm text-gray-600 mb-4 sm:mb-6">
                       Ask questions about your data in plain English.
                       I'll automatically find the right table and generate the query.
                     </p>
@@ -376,7 +372,7 @@ const Chat = () => {
                         <button
                           key={idx}
                           onClick={() => handleSend(example)}
-                          className="block w-full px-4 py-3 text-sm text-left bg-white border border-gray-200 rounded-lg hover:border-green-300 hover:bg-green-50 transition-colors"
+                          className="block w-full px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm text-left bg-white border border-gray-200 rounded-lg hover:border-green-300 hover:bg-green-50 transition-colors active:scale-[0.98]"
                         >
                           {example}
                         </button>
@@ -395,7 +391,7 @@ const Chat = () => {
                       
                       {/* Show query details for assistant messages */}
                       {message.role === 'assistant' && message.translation && (
-                        <div className="ml-8 sm:ml-11 mb-4 sm:mb-6 space-y-3 sm:space-y-4">
+                        <div className="ml-7 sm:ml-9 md:ml-11 mb-4 sm:mb-6 space-y-3 sm:space-y-4">
                           {/* Auto-detection badge */}
                           {message.translation.autoDetected && message.translation.detectedFrom && (
                             <AutoDetectionBadge detectedFrom={message.translation.detectedFrom} />
@@ -502,6 +498,32 @@ const Chat = () => {
                 ? 'Connect a database first...'
                 : 'Ask a question about your data...'
             }
+          />
+        </div>
+
+        {/* Mobile sidebar backdrop */}
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+
+        {/* Right Sidebar */}
+        <div className={`
+          fixed lg:static inset-y-0 right-0 z-50
+          transform transition-transform duration-300 ease-in-out
+          ${sidebarOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}
+        `}>
+          <ChatSidebar
+            chatHistory={chatHistory}
+            currentChatId={currentChatId}
+            onSelectChat={(id) => {
+              handleSelectChat(id);
+              setSidebarOpen(false);
+            }}
+            onDeleteChat={handleDeleteChat}
+            onClose={() => setSidebarOpen(false)}
           />
         </div>
       </div>
