@@ -2,8 +2,6 @@ import { useState, useEffect } from 'react';
 import DashboardLayout from '../components/DashboardLayout';
 import Card from '../components/Card';
 import Button from '../components/Button';
-import Modal from '../components/Modal';
-import Input from '../components/Input';
 import { Send, Loader2 } from 'lucide-react';
 import apiService from '../services/apiService';
 
@@ -13,15 +11,75 @@ const Chat = () => {
   const [loading, setLoading] = useState(false);
   const [connections, setConnections] = useState([]);
   const [selectedConnection, setSelectedConnection] = useState('');
+  const [currentTranslation, setCurrentTranslation] = useState(null);
+  const [executionResult, setExecutionResult] = useState(null);
+  const [executing, setExecuting] = useState(false);
+  const [executionError, setExecutionError] = useState(null);
+  const [pendingConfirmation, setPendingConfirmation] = useState(null);
 
   useEffect(() => {
     fetchConnections();
   }, []);
 
+  const formatCost = (value) => {
+    if (typeof value !== 'number') {
+      return 'N/A';
+    }
+    return value.toFixed(2);
+  };
+
+  const getQueryFromTranslation = (translationLike) => {
+    if (!translationLike) {
+      return null;
+    }
+    return (
+      translationLike.query ||
+      translationLike.mongoQuery ||
+      translationLike.sqlQuery ||
+      null
+    );
+  };
+
+  const formatQueryContent = (translationLike) => {
+    const query = getQueryFromTranslation(translationLike);
+    if (!query) {
+      return 'No query generated';
+    }
+    if (typeof query === 'string') {
+      return query;
+    }
+    return JSON.stringify(query, null, 2);
+  };
+
+  const formatResultsPreview = (results) => {
+    if (!results || (Array.isArray(results) && results.length === 0)) {
+      return 'No results returned.';
+    }
+
+    const trimmed = Array.isArray(results) ? results.slice(0, 5) : results;
+    return JSON.stringify(trimmed, null, 2);
+  };
+
+  const getSafetyBadgeClasses = (level) => {
+    switch ((level || 'safe').toLowerCase()) {
+      case 'unsafe':
+        return 'bg-red-100 text-red-700 border border-red-200';
+      case 'warning':
+        return 'bg-amber-100 text-amber-700 border border-amber-200';
+      default:
+        return 'bg-green-100 text-green-700 border border-green-200';
+    }
+  };
+
+  const selectedConnectionInfo = connections.find(
+    (conn) => conn._id === selectedConnection
+  );
+  const hasAdditionalResults =
+    Array.isArray(executionResult?.results) && executionResult.results.length > 5;
+
   const fetchConnections = async () => {
     try {
       const data = await apiService.getDatabaseConnections();
-      console.log('Database connections:', data);
       
       // Ensure data is an array
       const connectionsArray = Array.isArray(data) ? data : [];
@@ -29,8 +87,11 @@ const Chat = () => {
       
       if (connectionsArray.length > 0) {
         const firstConnectionId = connectionsArray[0]._id;
-        console.log('Setting selected connection to:', firstConnectionId);
         setSelectedConnection(firstConnectionId); // Use connection _id
+        setCurrentTranslation(null);
+        setExecutionResult(null);
+        setPendingConfirmation(null);
+        setExecutionError(null);
       }
     } catch (error) {
       console.error('Failed to fetch database connections:', error);
@@ -40,6 +101,10 @@ const Chat = () => {
 
   const handleSend = async () => {
     if (!input.trim() || !selectedConnection) return;
+
+    const contextPayload = messages
+      .slice(-6)
+      .map((msg) => ({ role: msg.role, content: msg.content }));
 
     const userMessage = {
       id: Date.now(),
@@ -53,16 +118,17 @@ const Chat = () => {
     setLoading(true);
 
     try {
-      console.log('Sending translation request with connectionId:', selectedConnection);
       const response = await apiService.translateQuery({
         query: input,
         connectionId: selectedConnection,
+        context: contextPayload,
       });
-      const translation = response?.data || response;
-      const queryPayload = translation?.query || translation?.mongoQuery || translation?.sqlQuery;
-      const formattedQuery = typeof queryPayload === 'string'
-        ? queryPayload
-        : JSON.stringify(queryPayload, null, 2);
+      if (!response?.success) {
+        throw new Error(response?.error || 'Translation failed');
+      }
+
+      const translation = response.data;
+      const formattedQuery = formatQueryContent(translation);
 
       const aiMessage = {
         id: Date.now() + 1,
@@ -71,10 +137,18 @@ const Chat = () => {
         explanation: translation?.explain,
         safety: translation?.safety,
         warningMessage: translation?.warningMessage,
-        results: translation?.preview?.rows || translation?.results,
+        metadata: {
+          estimatedCost: translation?.estimatedCost,
+          requiresIndexes: translation?.requiresIndexes || []
+        },
+        translation,
         timestamp: new Date(),
       };
 
+      setCurrentTranslation(translation);
+      setExecutionResult(null);
+      setPendingConfirmation(null);
+      setExecutionError(null);
       setMessages(prev => [...prev, aiMessage]);
     } catch (error) {
       const errorMessage = {
@@ -87,6 +161,46 @@ const Chat = () => {
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleExecute = async (options = {}) => {
+    if (!currentTranslation || !selectedConnection) {
+      return;
+    }
+
+    setExecuting(true);
+    setExecutionError(null);
+    setPendingConfirmation(null);
+
+    try {
+      const response = await apiService.executeQuery({
+        translation: currentTranslation,
+        connectionId: selectedConnection,
+        options
+      });
+
+      if (response?.requiresConfirmation) {
+        setPendingConfirmation({
+          message: response.message,
+          estimatedCost: response.estimatedCost
+        });
+        return;
+      }
+
+      if (!response?.success) {
+        throw new Error(response?.error || 'Query execution failed');
+      }
+
+      const resultData = response.data;
+      setExecutionResult(resultData);
+      setPendingConfirmation(null);
+    } catch (error) {
+      const errMessage =
+        error?.response?.data?.error || error?.message || 'Query execution failed';
+      setExecutionError(errMessage);
+    } finally {
+      setExecuting(false);
     }
   };
 
@@ -113,8 +227,12 @@ const Chat = () => {
               <select
                 value={selectedConnection}
                 onChange={(e) => {
-                  console.log('Connection changed to:', e.target.value);
-                  setSelectedConnection(e.target.value);
+                  const value = e.target.value;
+                  setSelectedConnection(value);
+                  setCurrentTranslation(null);
+                  setExecutionResult(null);
+                  setPendingConfirmation(null);
+                  setExecutionError(null);
                 }}
                 className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-black focus:border-black"
               >
@@ -185,19 +303,39 @@ const Chat = () => {
                     <div className="text-sm leading-6 whitespace-pre-wrap">
                       {message.content}
                     </div>
-                    {message.explanation && (
-                      <div className="mt-3 pt-3 border-t border-gray-200 text-sm text-gray-600">
-                        {message.explanation}
-                      </div>
-                    )}
-                    {message.results && (
-                      <div className="mt-3 pt-3 border-t border-gray-200">
-                        <p className="text-xs text-gray-500 mb-2">
-                          {message.results.length} results
-                        </p>
-                        <pre className="text-xs bg-white border border-gray-200 rounded p-2 overflow-x-auto">
-                          {JSON.stringify(message.results.slice(0, 3), null, 2)}
-                        </pre>
+                    {(message.explanation || message.warningMessage || typeof message.metadata?.estimatedCost === 'number' || message.results) && (
+                      <div className="mt-3 space-y-2 border-t border-gray-200 pt-3">
+                        {message.explanation && (
+                          <div className="text-sm text-gray-600">
+                            {message.explanation}
+                          </div>
+                        )}
+                        {message.warningMessage && (
+                          <div className="text-sm text-amber-700">
+                            {message.warningMessage}
+                          </div>
+                        )}
+                        {typeof message.metadata?.estimatedCost === 'number' && (
+                          <div className="text-xs text-gray-500">
+                            Estimated cost: {formatCost(message.metadata.estimatedCost)}
+                          </div>
+                        )}
+                        {message.results && (
+                          <div>
+                            <p className="text-xs text-gray-500 mb-2">
+                              {Array.isArray(message.results) ? message.results.length : 1} results
+                            </p>
+                            <pre className="text-xs bg-white border border-gray-200 rounded p-2 overflow-x-auto">
+                              {JSON.stringify(
+                                Array.isArray(message.results)
+                                  ? message.results.slice(0, 3)
+                                  : message.results,
+                                null,
+                                2
+                              )}
+                            </pre>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -209,6 +347,182 @@ const Chat = () => {
                     <Loader2 className="w-5 h-5 text-gray-600 animate-spin" />
                   </div>
                 </div>
+              )}
+              {currentTranslation && (
+                <Card
+                  key={currentTranslation.translationId}
+                  title="Generated Query"
+                  description="Review the translated query before executing it."
+                >
+                  <div className="space-y-4">
+                    <div>
+                      <div className="flex items-center justify-between text-xs font-medium uppercase text-gray-500">
+                        <span>
+                          Query {currentTranslation.dbType ? `(${currentTranslation.dbType.toUpperCase()})` : ''}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${getSafetyBadgeClasses(currentTranslation.safety)}`}>
+                            {currentTranslation.safety || 'safe'}
+                          </span>
+                          <span className="text-gray-500">
+                            Cost {formatCost(currentTranslation.estimatedCost)}
+                          </span>
+                        </div>
+                      </div>
+                      <pre className="mt-2 max-h-80 overflow-x-auto overflow-y-auto rounded-lg bg-gray-900 p-4 text-sm leading-6 text-green-200">
+                        {formatQueryContent(currentTranslation)}
+                      </pre>
+                    </div>
+                    {(selectedConnectionInfo?.name || currentTranslation.collection || typeof currentTranslation.tokensUsed === 'number' || typeof currentTranslation.llmResponseTime === 'number') && (
+                      <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
+                        {selectedConnectionInfo?.name && (
+                          <span className="font-medium text-gray-600">
+                            Connection: {selectedConnectionInfo.name}
+                          </span>
+                        )}
+                        {currentTranslation.collection && (
+                          <span className="font-medium text-gray-600">
+                            Target: {currentTranslation.collection}
+                          </span>
+                        )}
+                        {typeof currentTranslation.tokensUsed === 'number' && (
+                          <span>Tokens: {currentTranslation.tokensUsed}</span>
+                        )}
+                        {typeof currentTranslation.llmResponseTime === 'number' && (
+                          <span>Generated in {currentTranslation.llmResponseTime}ms</span>
+                        )}
+                      </div>
+                    )}
+                    {currentTranslation.explain && (
+                      <div className="text-sm text-gray-600">
+                        {currentTranslation.explain}
+                      </div>
+                    )}
+                    {currentTranslation.requiresIndexes && currentTranslation.requiresIndexes.length > 0 && (
+                      <div>
+                        <p className="text-xs font-medium uppercase text-gray-500">Suggested indexes</p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {currentTranslation.requiresIndexes.map((indexKey) => (
+                            <span
+                              key={indexKey}
+                              className="rounded-md border border-gray-200 bg-gray-100 px-2 py-1 text-xs text-gray-700"
+                            >
+                              {indexKey}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {currentTranslation.warningMessage && (
+                      <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                        {currentTranslation.warningMessage}
+                      </div>
+                    )}
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => handleExecute()}
+                        disabled={executing || loading}
+                        variant="primary"
+                        className="flex items-center gap-2"
+                      >
+                        {executing ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          'Execute Query'
+                        )}
+                      </Button>
+                    </div>
+                    {executing && !pendingConfirmation && (
+                      <div className="flex items-center gap-2 text-xs text-gray-500">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Running query...</span>
+                      </div>
+                    )}
+                    {pendingConfirmation && (
+                      <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-3">
+                        <p className="text-sm text-amber-700">{pendingConfirmation.message}</p>
+                        {typeof pendingConfirmation.estimatedCost === 'number' && (
+                          <p className="text-xs text-amber-700">
+                            Estimated cost: {formatCost(pendingConfirmation.estimatedCost)}
+                          </p>
+                        )}
+                        <div className="flex gap-2">
+                          <Button
+                            onClick={() => handleExecute({ confirmed: true })}
+                            disabled={executing}
+                            variant="destructive"
+                            className="flex items-center gap-2"
+                          >
+                            {executing ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              'Run Anyway'
+                            )}
+                          </Button>
+                          <Button
+                            onClick={() => setPendingConfirmation(null)}
+                            disabled={executing}
+                            variant="secondary"
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                    {executionError && (
+                      <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                        {executionError}
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              )}
+              {executionResult && (
+                <Card
+                  key={executionResult.executionId}
+                  title="Execution Output"
+                  description="Results returned from your database."
+                >
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
+                      <span className="font-medium text-gray-700">
+                        {executionResult.rowCount ?? (Array.isArray(executionResult.results) ? executionResult.results.length : 0)} rows
+                      </span>
+                      {typeof executionResult.executionTime === 'number' && (
+                        <span>Execution time: {executionResult.executionTime}ms</span>
+                      )}
+                      {executionResult.cached && (
+                        <span className="rounded-full border border-indigo-200 bg-indigo-50 px-2 py-1 text-indigo-600">
+                          Cached result
+                        </span>
+                      )}
+                      {executionResult.truncated && (
+                        <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-amber-700">
+                          Truncated
+                        </span>
+                      )}
+                    </div>
+                    {executionResult.executionId && (
+                      <div className="text-xs text-gray-500">
+                        Execution ID:{' '}
+                        <span className="font-mono text-gray-700">{executionResult.executionId}</span>
+                      </div>
+                    )}
+                    <pre className="max-h-96 overflow-x-auto overflow-y-auto rounded-lg bg-gray-900 p-4 text-sm leading-6 text-green-200">
+                      {formatResultsPreview(executionResult.results)}
+                    </pre>
+                    {hasAdditionalResults && !executionResult.truncated && (
+                      <p className="text-xs text-gray-500">
+                        Showing first 5 rows. Refine your query or export full results from history.
+                      </p>
+                    )}
+                    {executionResult.truncated && (
+                      <p className="text-xs text-amber-700">
+                        Results truncated to protect the workspace. Apply filters or limits for smaller result sets.
+                      </p>
+                    )}
+                  </div>
+                </Card>
               )}
             </div>
           )}

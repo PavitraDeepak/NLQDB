@@ -1,10 +1,26 @@
 import mongoose from 'mongoose';
 
 const auditQuerySchema = new mongoose.Schema({
+  organizationId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Organization',
+    index: true,
+    default: null
+  },
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: [true, 'User ID is required']
+  },
+  type: {
+    type: String,
+    enum: ['translation', 'execution'],
+    default: 'translation'
+  },
+  translationId: {
+    type: String,
+    index: true,
+    default: null
   },
   userQuery: {
     type: String,
@@ -53,6 +69,10 @@ const auditQuerySchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  tokensUsed: {
+    type: Number,
+    default: 0
+  },
   explain: {
     type: String,
     maxlength: [2000, 'Explanation cannot exceed 2000 characters']
@@ -60,6 +80,14 @@ const auditQuerySchema = new mongoose.Schema({
   requiresIndexes: {
     type: [String],
     default: []
+  },
+  metadata: {
+    type: mongoose.Schema.Types.Mixed,
+    default: {}
+  },
+  success: {
+    type: Boolean,
+    default: true
   },
   error: {
     type: String,
@@ -83,6 +111,8 @@ auditQuerySchema.index({ userId: 1, timestamp: -1 });
 auditQuerySchema.index({ collection: 1, timestamp: -1 });
 auditQuerySchema.index({ executed: 1, safetyPassed: 1 });
 auditQuerySchema.index({ timestamp: -1 });
+auditQuerySchema.index({ organizationId: 1, createdAt: -1 });
+auditQuerySchema.index({ translationId: 1 });
 
 const AuditQuery = mongoose.model('AuditQuery', auditQuerySchema);
 

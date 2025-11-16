@@ -105,31 +105,64 @@ export const validateObjectId = (paramName = 'id') => {
  * Prevent NoSQL injection attempts
  */
 export const preventNoSQLInjection = (req, res, next) => {
-  const checkForInjection = (obj) => {
-    if (typeof obj === 'object' && obj !== null) {
-      for (const key in obj) {
-        // Check for MongoDB operators in keys
-        if (key.startsWith('$')) {
+  const allowlistedPaths = [
+    '/api/chat/execute',
+    '/api/chat/preview',
+    '/api/chat/replay',
+    '/api/chat/result',
+    '/api/chat/history'
+  ];
+
+  const skipTranslationCheck = allowlistedPaths.some((path) => req.path.startsWith(path));
+
+  const checkForInjection = (value, path = []) => {
+    if (value === null || value === undefined) {
+      return false;
+    }
+
+    // Skip scanning trusted translation payloads that contain Mongo operators by design
+    if (skipTranslationCheck && path[0] === 'translation') {
+      return false;
+    }
+
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+      return false;
+    }
+
+    if (Array.isArray(value)) {
+      for (let index = 0; index < value.length; index += 1) {
+        if (checkForInjection(value[index], path)) {
           return true;
         }
-        
-        // Recursively check nested objects
-        if (typeof obj[key] === 'object') {
-          if (checkForInjection(obj[key])) {
-            return true;
-          }
+      }
+      return false;
+    }
+
+    if (typeof value === 'object') {
+      for (const key of Object.keys(value)) {
+        if (typeof key === 'string' && key.startsWith('$')) {
+          return true;
+        }
+
+        const nextPath = path.length === 0 ? [key] : [...path, key];
+        if (checkForInjection(value[key], nextPath)) {
+          return true;
         }
       }
     }
+
     return false;
   };
 
-  // Check body, query, and params
   if (
     checkForInjection(req.body) ||
     checkForInjection(req.query) ||
     checkForInjection(req.params)
   ) {
+    console.warn('Blocked request due to potential NoSQL injection', {
+      path: req.originalUrl,
+      method: req.method
+    });
     return res.status(400).json({
       success: false,
       error: 'Potentially malicious input detected'

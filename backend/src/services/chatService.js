@@ -162,6 +162,7 @@ ${schemaDescription}
 Return ONLY valid JSON (no markdown, no code blocks, no extra text):
 {
   "${dbType === 'mongodb' ? 'mongoQuery' : 'sqlQuery'}": "<your generated query>",
+  "${dbType === 'mongodb' ? 'collection' : 'table'}": "<exact name of the target collection/table>",
   "explain": "<brief explanation of what the query does>",
   "requiresIndexes": ["<list of columns/fields that should be indexed for performance>"],
   "estimatedCost": <number between 0-1, where 1 is most expensive>,
@@ -261,8 +262,15 @@ Response: {
       // Check cache
       const cacheKey = this._getCacheKey(naturalLanguageQuery, connectionId, context);
       if (this.translationCache.has(cacheKey)) {
-        Logger.debug('Translation cache hit', { cacheKey });
-        return { ...this.translationCache.get(cacheKey), cached: true };
+        const cachedTranslation = this.translationCache.get(cacheKey);
+        const locationField = dbType === 'mongodb' ? 'collection' : 'table';
+        if (!cachedTranslation?.[locationField]) {
+          Logger.debug('Discarding stale cached translation missing location metadata', { cacheKey });
+          this.translationCache.delete(cacheKey);
+        } else {
+          Logger.debug('Translation cache hit', { cacheKey });
+          return { ...cachedTranslation, cached: true };
+        }
       }
 
       // Get database connection and schema
@@ -390,10 +398,18 @@ Response: {
       // Generate signature for audit trail
       const signature = this._signTranslation(translation, userId, organizationId);
 
+      const rawQuery = translation[dbType === 'mongodb' ? 'mongoQuery' : 'sqlQuery'];
+      const collectionName = translation.collection
+        || translation.table
+        || rawQuery?.collection
+        || translation.targetCollection
+        || translation.metadata?.collection
+        || null;
+
       // Prepare result
       const result = {
         translationId: crypto.randomUUID(),
-        query: translation[dbType === 'mongodb' ? 'mongoQuery' : 'sqlQuery'],
+        query: rawQuery,
         explain: translation.explain,
         requiresIndexes: translation.requiresIndexes || [],
         estimatedCost: translation.estimatedCost || 0.5,
@@ -401,11 +417,19 @@ Response: {
         warningMessage: translation.warningMessage,
         dbType,
         connectionId,
+        collection: collectionName,
+        table: translation.table || null,
         signature,
         tokensUsed,
         llmResponseTime,
         cached: false,
-        timestamp: new Date()
+        timestamp: new Date(),
+        metadata: {
+          ...(translation.metadata || {}),
+          collection: collectionName,
+          table: translation.table || null
+        },
+        originalQuery: naturalLanguageQuery
       };
 
       // Cache translation
@@ -497,7 +521,7 @@ Response: {
       
       try {
         results = await Promise.race([
-          this._executeWithLimits(connection, translation.query, translation.dbType, options),
+          this._executeWithLimits(connection, translation, options),
           this._timeoutPromise(this.MAX_EXECUTION_TIME_MS)
         ]);
       } catch (execError) {
@@ -548,9 +572,12 @@ Response: {
         query: translation.query,
         explain: translation.explain,
         results: results.rows || results,
+        data: results.rows || results,
         rowCount: executionResult.rowCount,
         executionTime,
         status: 'success',
+        truncated: executionResult.truncated,
+        cached: executionResult.cached,
         metadata: {
           dbType: translation.dbType,
           estimatedCost: translation.estimatedCost,
@@ -588,6 +615,7 @@ Response: {
         query: translation?.query || '',
         explain: translation?.explain || '',
         results: [],
+        data: [],
         rowCount: 0,
         executionTime: 0,
         status: 'failed',
@@ -602,25 +630,29 @@ Response: {
   /**
    * Execute query with row/time limits
    */
-  async _executeWithLimits(connection, query, dbType, options = {}) {
+  async _executeWithLimits(connection, translation, options = {}) {
     const limit = Math.min(options.limit || this.MAX_ROWS, this.MAX_ROWS);
 
-    if (dbType === 'mongodb') {
+    if (translation.dbType === 'mongodb') {
       // MongoDB query execution
       return await externalDatabaseService.executeMongoQuery(
         connection,
-        query,
-        { limit }
+        translation.query,
+        {
+          limit,
+          collection: translation.collection,
+          metadata: translation.metadata || {}
+        }
       );
-    } else if (dbType === 'postgresql' || dbType === 'mysql') {
+    } else if (translation.dbType === 'postgresql' || translation.dbType === 'mysql') {
       // SQL query execution
       return await externalDatabaseService.executeSQLQuery(
         connection,
-        query,
+        translation.query,
         { limit }
       );
     } else {
-      throw new Error(`Unsupported database type: ${dbType}`);
+      throw new Error(`Unsupported database type: ${translation.dbType}`);
     }
   }
 
@@ -645,6 +677,11 @@ Response: {
 
     if (!translation.explain) {
       return { valid: false, reason: 'Missing explanation' };
+    }
+
+    const locationField = dbType === 'mongodb' ? 'collection' : 'table';
+    if (!translation[locationField] || typeof translation[locationField] !== 'string') {
+      return { valid: false, reason: `Missing ${locationField} name in translation` };
     }
 
     // SQL validation
@@ -836,21 +873,63 @@ Generate 3 clarifying questions to help refine the query. Return only a JSON arr
    */
   async _auditTranslation(translation, naturalLanguageQuery, organizationId, userId) {
     try {
+      if (!translation || !naturalLanguageQuery) {
+        return;
+      }
+
+      const rawQuery = translation.query
+        || translation.mongoQuery
+        || translation.sqlQuery
+        || translation.metadata?.query
+        || null;
+
+      const queryPayload = rawQuery ?? {};
+      const collectionName = translation.collection
+        || translation.table
+        || queryPayload?.collection
+        || translation.metadata?.tableName
+        || null;
+
+      const isAggregate = translation.dbType === 'mongodb' && (
+        Array.isArray(queryPayload)
+        || Array.isArray(queryPayload?.aggregate)
+        || !!queryPayload?.aggregate
+      );
+
+      const safetyInfo = translation.safety;
+      const safetyPassed = typeof safetyInfo === 'object'
+        ? safetyInfo.allowed !== false
+        : safetyInfo === true || safetyInfo === 'safe' || safetyInfo === undefined;
+
+      const safetyReason = typeof safetyInfo === 'object'
+        ? safetyInfo.reason
+        : translation.warningMessage || '';
+
       await AuditQuery.create({
         organizationId,
         userId,
         type: 'translation',
-        naturalLanguageQuery,
-        translatedQuery: translation.query,
-        explain: translation.explain,
-        safety: translation.safety,
-        estimatedCost: translation.estimatedCost,
-        tokensUsed: translation.tokensUsed,
+        translationId: translation.translationId,
+        userQuery: naturalLanguageQuery,
+        generatedQuery: queryPayload,
+        queryType: translation.dbType === 'mongodb'
+          ? (isAggregate ? 'aggregate' : 'find')
+          : 'select',
+        collection: collectionName || 'unknown',
+        executed: false,
+        safetyPassed,
+        safetyReason,
+        explain: translation.explain || '',
+        requiresIndexes: (translation.requiresIndexes || []).map(idx => String(idx)),
+        tokensUsed: translation.tokensUsed || 0,
         metadata: {
-          translationId: translation.translationId,
           dbType: translation.dbType,
-          connectionId: translation.connectionId
-        }
+          connectionId: translation.connectionId,
+          estimatedCost: translation.estimatedCost,
+          table: translation.table || null,
+          collection: collectionName || null
+        },
+        success: true
       });
     } catch (error) {
       Logger.error('Failed to audit translation', error);
@@ -862,21 +941,75 @@ Generate 3 clarifying questions to help refine the query. Return only a JSON arr
    */
   async _auditExecution(execution, translation, organizationId, userId) {
     try {
-      await AuditQuery.create({
-        organizationId,
-        userId,
-        type: 'execution',
-        naturalLanguageQuery: '',
-        translatedQuery: translation.query,
-        explain: translation.explain,
-        rowCount: execution.rowCount,
+      if (!execution || !translation) {
+        return;
+      }
+
+      const resultCount = Array.isArray(execution.results)
+        ? execution.results.length
+        : execution.rowCount || 0;
+
+      const safetyInfo = translation.safety;
+      const safetyPassed = typeof safetyInfo === 'object'
+        ? safetyInfo.allowed !== false
+        : safetyInfo === true || safetyInfo === 'safe' || safetyInfo === undefined;
+
+      const update = {
+        executed: true,
         executionTime: execution.executionTime,
+        resultCount,
+        success: true,
         metadata: {
+          ...(translation.metadata || {}),
           executionId: execution.executionId,
-          translationId: translation.translationId,
-          connectionId: execution.connectionId
+          connectionId: execution.connectionId,
+          cached: execution.cached
         }
-      });
+      };
+
+      const updated = await AuditQuery.findOneAndUpdate(
+        {
+          translationId: translation.translationId,
+          userId
+        },
+        update,
+        { new: true }
+      );
+
+      if (!updated) {
+        const inferredQueryType = translation.dbType === 'mongodb'
+          ? (Array.isArray(translation.query) ? 'aggregate' : 'find')
+          : 'select';
+
+        await AuditQuery.create({
+          organizationId,
+          userId,
+          type: 'execution',
+          translationId: translation.translationId,
+          userQuery: translation.originalQuery || '',
+          generatedQuery: translation.query || {},
+          queryType: inferredQueryType,
+          collection: translation.collection
+            || translation.query?.collection
+            || translation.table
+            || 'unknown',
+          executed: true,
+          executionTime: execution.executionTime,
+          resultCount,
+          safetyPassed,
+          safetyReason: typeof safetyInfo === 'object' ? safetyInfo.reason : translation.warningMessage || '',
+          explain: translation.explain || '',
+          requiresIndexes: (translation.requiresIndexes || []).map(idx => String(idx)),
+          tokensUsed: translation.tokensUsed || 0,
+          metadata: {
+            executionId: execution.executionId,
+            connectionId: execution.connectionId,
+            cached: execution.cached,
+            dbType: translation.dbType
+          },
+          success: true
+        });
+      }
     } catch (error) {
       Logger.error('Failed to audit execution', error);
     }
