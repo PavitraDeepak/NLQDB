@@ -64,23 +64,23 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white">
+    <div className="min-h-screen flex items-center justify-center bg-white px-4 sm:px-6 lg:px-8">
       <div className="w-full max-w-md">
         {/* Logo */}
-        <div className="flex justify-center mb-8">
+        <div className="flex justify-center mb-6 sm:mb-8">
           <div className="flex items-center gap-2">
-            <div className="w-10 h-10 bg-black rounded-md flex items-center justify-center">
-              <span className="text-white font-bold text-lg">NL</span>
+            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-black rounded-md flex items-center justify-center">
+              <span className="text-white font-bold text-base sm:text-lg">NL</span>
             </div>
-            <span className="text-2xl font-semibold text-gray-900">NLQDB</span>
+            <span className="text-xl sm:text-2xl font-semibold text-gray-900">NLQDB</span>
           </div>
         </div>
 
         {/* Login Card */}
-        <div className="bg-white border border-gray-200 rounded-lg p-8">
-          <div className="mb-6">
-            <h1 className="text-2xl font-semibold text-gray-900">Sign in</h1>
-            <p className="text-sm text-gray-500 mt-2">
+        <div className="bg-white border border-gray-200 rounded-lg p-6 sm:p-8">
+          <div className="mb-4 sm:mb-6">
+            <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Sign in</h1>
+            <p className="text-xs sm:text-sm text-gray-500 mt-2">
               Welcome back! Please enter your details.
             </p>
           </div>

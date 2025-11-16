@@ -20,9 +20,9 @@ export default function ChatInput({ onSend, disabled, placeholder }) {
   };
 
   return (
-    <div className="border-t border-gray-200 bg-white px-6 py-4">
+    <div className="border-t border-gray-200 bg-white px-3 sm:px-6 py-3 sm:py-4">
       <form onSubmit={handleSubmit} className="max-w-4xl mx-auto">
-        <div className="flex items-end gap-3">
+        <div className="flex items-end gap-2 sm:gap-3">
           <div className="flex-1">
             <textarea
               value={input}
@@ -38,12 +38,12 @@ export default function ChatInput({ onSend, disabled, placeholder }) {
           <button
             type="submit"
             disabled={!input.trim() || disabled}
-            className="flex-shrink-0 p-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+            className="flex-shrink-0 p-2 sm:p-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
           >
-            <PaperAirplaneIcon className="w-5 h-5" />
+            <PaperAirplaneIcon className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         </div>
-        <p className="text-xs text-gray-500 mt-2">
+        <p className="text-xs text-gray-500 mt-2 hidden sm:block">
           Press Enter to send, Shift+Enter for new line
         </p>
       </form>

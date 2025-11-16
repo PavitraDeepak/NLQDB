@@ -395,7 +395,7 @@ const Chat = () => {
                       
                       {/* Show query details for assistant messages */}
                       {message.role === 'assistant' && message.translation && (
-                        <div className="ml-11 mb-6">
+                        <div className="ml-8 sm:ml-11 mb-4 sm:mb-6 space-y-3 sm:space-y-4">
                           {/* Auto-detection badge */}
                           {message.translation.autoDetected && message.translation.detectedFrom && (
                             <AutoDetectionBadge detectedFrom={message.translation.detectedFrom} />

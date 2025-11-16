@@ -216,12 +216,12 @@ const DatabaseConnections = () => {
 
   return (
     <DashboardLayout>
-      <div className="p-10">
+      <div className="p-4 sm:p-6 lg:p-10">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl font-semibold text-gray-900">Database Connections</h1>
-            <p className="text-sm text-gray-500 mt-1">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Database Connections</h1>
+            <p className="text-sm sm:text-base text-gray-500 mt-1">
               Manage external database connections for your organization
             </p>
           </div>

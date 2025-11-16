@@ -78,21 +78,21 @@ export default function ResultsTable({ results, rowCount, executionTime, onExpor
       {/* Collapsible Header */}
       <div
         onClick={() => setIsOpen(!isOpen)}
-        className="px-4 py-3 bg-gray-50 border-b border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors"
+        className="flex items-center justify-between px-3 sm:px-4 py-2 sm:py-3 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors"
       >
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             {isOpen ? (
-              <ChevronDownIcon className="w-4 h-4 text-gray-500" />
+              <ChevronDownIcon className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500" />
             ) : (
-              <ChevronRightIcon className="w-4 h-4 text-gray-500" />
+              <ChevronRightIcon className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500" />
             )}
-            <span className="text-sm font-medium text-gray-700">View Data</span>
+            <span className="text-xs sm:text-sm font-medium text-gray-700">View Data</span>
             <span className="text-xs text-gray-500">
               ({rowCount || results.length} rows)
             </span>
             {executionTime !== undefined && (
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-gray-500 hidden sm:inline">
                 • {executionTime}ms
               </span>
             )}
@@ -103,10 +103,10 @@ export default function ResultsTable({ results, rowCount, executionTime, onExpor
                 e.stopPropagation();
                 onExportCSV();
               }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+              className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
             >
               <ArrowDownTrayIcon className="w-3.5 h-3.5" />
-              Export CSV
+              <span className="hidden sm:inline">Export CSV</span>
             </button>
           )}
         </div>
@@ -114,15 +114,16 @@ export default function ResultsTable({ results, rowCount, executionTime, onExpor
 
       {/* Table Content */}
       {isOpen && (
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
+        <div className="overflow-x-auto -mx-4 sm:mx-0">
+          <div className="inline-block min-w-full align-middle">
+            <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
                 {columns.map((col) => (
                   <th
                     key={col}
                     onClick={() => handleSort(col)}
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky top-0 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors group"
+                    className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky top-0 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors group whitespace-nowrap"
                   >
                     <div className="flex items-center gap-1.5">
                       <span>{col}</span>
@@ -138,7 +139,7 @@ export default function ResultsTable({ results, rowCount, executionTime, onExpor
                   {columns.map((col) => (
                     <td
                       key={col}
-                      className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap"
+                      className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-900 whitespace-nowrap"
                     >
                       {typeof row[col] === 'object' && row[col] !== null
                         ? JSON.stringify(row[col])
@@ -149,8 +150,9 @@ export default function ResultsTable({ results, rowCount, executionTime, onExpor
               ))}
             </tbody>
           </table>
+          </div>
           {results.length > 100 && (
-            <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 text-sm text-gray-500 text-center">
+            <div className="px-3 sm:px-4 py-2 sm:py-3 bg-gray-50 border-t border-gray-200 text-xs sm:text-sm text-gray-500 text-center">
               Showing first 100 of {results.length} rows
             </div>
           )}

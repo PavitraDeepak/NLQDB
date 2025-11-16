@@ -78,31 +78,31 @@ const Dashboard = () => {
 
   return (
     <DashboardLayout>
-      <div className="p-10">
+      <div className="p-4 sm:p-6 lg:p-10">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
-          <p className="text-sm text-gray-500 mt-1">
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Dashboard</h1>
+          <p className="text-xs sm:text-sm text-gray-500 mt-1">
             Overview of your organization's usage and activity
           </p>
         </div>
 
         {/* Alert if approaching limits */}
         {(queryPercentage > 80 || tokenPercentage > 80) && (
-          <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5" />
-            <div>
-              <p className="text-sm font-medium text-yellow-900">
+          <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start gap-2 sm:gap-3">
+            <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs sm:text-sm font-medium text-yellow-900">
                 Approaching usage limits
               </p>
-              <p className="text-sm text-yellow-700 mt-1">
+              <p className="text-xs sm:text-sm text-yellow-700 mt-1">
                 You're using {Math.round(Math.max(queryPercentage, tokenPercentage))}% of your plan limits.
                 Consider upgrading to avoid service interruption.
               </p>
               <Button
                 variant="secondary"
                 size="sm"
-                className="mt-3"
+                className="mt-2 sm:mt-3"
                 onClick={() => navigate('/billing')}
               >
                 Upgrade Plan
@@ -112,25 +112,25 @@ const Dashboard = () => {
         )}
 
         {/* Metrics Grid */}
-        <div className="grid grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
           {/* Queries Metric */}
           <Card>
             <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-gray-500">Queries This Month</p>
-                <p className="text-3xl font-semibold text-gray-900 mt-2">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs sm:text-sm text-gray-500">Queries This Month</p>
+                <p className="text-2xl sm:text-3xl font-semibold text-gray-900 mt-1 sm:mt-2">
                   {usage?.queriesThisMonth?.toLocaleString() || 0}
                 </p>
-                <p className="text-sm text-gray-500 mt-1">
+                <p className="text-xs sm:text-sm text-gray-500 mt-1">
                   of {organization?.limits?.queriesPerMonth?.toLocaleString() || '∞'}
                 </p>
               </div>
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <Activity className="w-5 h-5 text-gray-600" />
+              <div className="p-2 sm:p-3 bg-gray-50 rounded-lg flex-shrink-0">
+                <Activity className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
               </div>
             </div>
             {/* Progress Bar */}
-            <div className="mt-4">
+            <div className="mt-3 sm:mt-4">
               <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                 <div
                   className={`h-full transition-all ${getUsageColor(queryPercentage)}`}
@@ -143,9 +143,9 @@ const Dashboard = () => {
           {/* Tokens Metric */}
           <Card>
             <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-gray-500">Tokens Used</p>
-                <p className="text-3xl font-semibold text-gray-900 mt-2">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs sm:text-sm text-gray-500">Tokens Used</p>
+                <p className="text-2xl sm:text-3xl font-semibold text-gray-900 mt-1 sm:mt-2">
                   {(usage?.tokensUsed || 0).toLocaleString()}
                 </p>
                 <p className="text-sm text-gray-500 mt-1">
