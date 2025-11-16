@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import DashboardLayout from '../components/DashboardLayout';
 import Card from '../components/Card';
 import Button from '../components/Button';
+import QuerySyntaxToggle from '../components/QuerySyntaxToggle';
 import { Send, Loader2 } from 'lucide-react';
 import apiService from '../services/apiService';
 
@@ -236,7 +237,7 @@ const Chat = () => {
                 }}
                 className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-black focus:border-black"
               >
-                <option key="empty" value="">Select database...</option>
+                <option key="auto" value="">Auto-detect from all databases</option>
                 {connections.map((conn) => (
                   <option key={conn._id} value={conn._id}>
                     {conn.name}
@@ -260,7 +261,7 @@ const Chat = () => {
                 </h3>
                 <p className="text-sm text-gray-500">
                   Ask questions about your data in plain English.
-                  I'll translate them into MongoDB queries.
+                  I'll automatically find the right table and generate the query.
                 </p>
                 <div className="mt-6 space-y-2">
                   <button
@@ -349,133 +350,72 @@ const Chat = () => {
                 </div>
               )}
               {currentTranslation && (
-                <Card
-                  key={currentTranslation.translationId}
-                  title="Generated Query"
-                  description="Review the translated query before executing it."
-                >
-                  <div className="space-y-4">
-                    <div>
-                      <div className="flex items-center justify-between text-xs font-medium uppercase text-gray-500">
-                        <span>
-                          Query {currentTranslation.dbType ? `(${currentTranslation.dbType.toUpperCase()})` : ''}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${getSafetyBadgeClasses(currentTranslation.safety)}`}>
-                            {currentTranslation.safety || 'safe'}
-                          </span>
-                          <span className="text-gray-500">
-                            Cost {formatCost(currentTranslation.estimatedCost)}
-                          </span>
-                        </div>
+                <div className="space-y-4">
+                  {/* Query Syntax Toggle - Always show syntax with toggle */}
+                  <QuerySyntaxToggle translation={currentTranslation} />
+                  
+                  {/* Execution Controls */}
+                  <Card>
+                    <div className="space-y-4">
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={() => handleExecute()}
+                          disabled={executing || loading}
+                          variant="primary"
+                          className="flex items-center gap-2"
+                        >
+                          {executing ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            'Execute Query'
+                          )}
+                        </Button>
                       </div>
-                      <pre className="mt-2 max-h-80 overflow-x-auto overflow-y-auto rounded-lg bg-gray-900 p-4 text-sm leading-6 text-green-200">
-                        {formatQueryContent(currentTranslation)}
-                      </pre>
-                    </div>
-                    {(selectedConnectionInfo?.name || currentTranslation.collection || typeof currentTranslation.tokensUsed === 'number' || typeof currentTranslation.llmResponseTime === 'number') && (
-                      <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
-                        {selectedConnectionInfo?.name && (
-                          <span className="font-medium text-gray-600">
-                            Connection: {selectedConnectionInfo.name}
-                          </span>
-                        )}
-                        {currentTranslation.collection && (
-                          <span className="font-medium text-gray-600">
-                            Target: {currentTranslation.collection}
-                          </span>
-                        )}
-                        {typeof currentTranslation.tokensUsed === 'number' && (
-                          <span>Tokens: {currentTranslation.tokensUsed}</span>
-                        )}
-                        {typeof currentTranslation.llmResponseTime === 'number' && (
-                          <span>Generated in {currentTranslation.llmResponseTime}ms</span>
-                        )}
-                      </div>
-                    )}
-                    {currentTranslation.explain && (
-                      <div className="text-sm text-gray-600">
-                        {currentTranslation.explain}
-                      </div>
-                    )}
-                    {currentTranslation.requiresIndexes && currentTranslation.requiresIndexes.length > 0 && (
-                      <div>
-                        <p className="text-xs font-medium uppercase text-gray-500">Suggested indexes</p>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {currentTranslation.requiresIndexes.map((indexKey) => (
-                            <span
-                              key={indexKey}
-                              className="rounded-md border border-gray-200 bg-gray-100 px-2 py-1 text-xs text-gray-700"
-                            >
-                              {indexKey}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {currentTranslation.warningMessage && (
-                      <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
-                        {currentTranslation.warningMessage}
-                      </div>
-                    )}
-                    <div className="flex gap-2">
-                      <Button
-                        onClick={() => handleExecute()}
-                        disabled={executing || loading}
-                        variant="primary"
-                        className="flex items-center gap-2"
-                      >
-                        {executing ? (
+                      {executing && !pendingConfirmation && (
+                        <div className="flex items-center gap-2 text-xs text-gray-500">
                           <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          'Execute Query'
-                        )}
-                      </Button>
-                    </div>
-                    {executing && !pendingConfirmation && (
-                      <div className="flex items-center gap-2 text-xs text-gray-500">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        <span>Running query...</span>
-                      </div>
-                    )}
-                    {pendingConfirmation && (
-                      <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-3">
-                        <p className="text-sm text-amber-700">{pendingConfirmation.message}</p>
-                        {typeof pendingConfirmation.estimatedCost === 'number' && (
-                          <p className="text-xs text-amber-700">
-                            Estimated cost: {formatCost(pendingConfirmation.estimatedCost)}
-                          </p>
-                        )}
-                        <div className="flex gap-2">
-                          <Button
-                            onClick={() => handleExecute({ confirmed: true })}
-                            disabled={executing}
-                            variant="destructive"
-                            className="flex items-center gap-2"
-                          >
-                            {executing ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              'Run Anyway'
-                            )}
-                          </Button>
-                          <Button
-                            onClick={() => setPendingConfirmation(null)}
-                            disabled={executing}
-                            variant="secondary"
-                          >
-                            Cancel
-                          </Button>
+                          <span>Running query...</span>
                         </div>
-                      </div>
-                    )}
-                    {executionError && (
-                      <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                        {executionError}
-                      </div>
-                    )}
-                  </div>
-                </Card>
+                      )}
+                      {pendingConfirmation && (
+                        <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-3">
+                          <p className="text-sm text-amber-700">{pendingConfirmation.message}</p>
+                          {typeof pendingConfirmation.estimatedCost === 'number' && (
+                            <p className="text-xs text-amber-700">
+                              Estimated cost: {formatCost(pendingConfirmation.estimatedCost)}
+                            </p>
+                          )}
+                          <div className="flex gap-2">
+                            <Button
+                              onClick={() => handleExecute({ confirmed: true })}
+                              disabled={executing}
+                              variant="destructive"
+                              className="flex items-center gap-2"
+                            >
+                              {executing ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                'Run Anyway'
+                              )}
+                            </Button>
+                            <Button
+                              onClick={() => setPendingConfirmation(null)}
+                              disabled={executing}
+                              variant="secondary"
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                      {executionError && (
+                        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                          {executionError}
+                        </div>
+                      )}
+                    </div>
+                  </Card>
+                </div>
               )}
               {executionResult && (
                 <Card
@@ -538,11 +478,11 @@ const Chat = () => {
                   onChange={(e) => setInput(e.target.value)}
                   onKeyPress={handleKeyPress}
                   placeholder={
-                    selectedConnection
-                      ? `Ask a question about your database...`
-                      : 'Select a database connection first...'
+                    connections.length === 0
+                      ? 'Connect a database first...'
+                      : 'Ask a question about your data...'
                   }
-                  disabled={!selectedConnection || loading}
+                  disabled={connections.length === 0 || loading}
                   rows={1}
                   className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-sm resize-none focus:ring-2 focus:ring-black focus:border-black disabled:bg-gray-50 disabled:text-gray-500"
                   style={{ minHeight: '48px', maxHeight: '120px' }}
@@ -550,7 +490,7 @@ const Chat = () => {
               </div>
               <Button
                 onClick={handleSend}
-                disabled={!input.trim() || !selectedConnection || loading}
+                disabled={!input.trim() || connections.length === 0 || loading}
                 variant="primary"
                 className="px-4 py-3"
               >

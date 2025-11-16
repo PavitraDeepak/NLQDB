@@ -9,6 +9,7 @@ import usageService from './usageService.js';
 import planService from './planService.js';
 import emailService from './emailService.js';
 import chatService from './chatService.js';
+import schemaAggregationService from './schemaAggregationService.js';
 
 export {
   llmService,
@@ -21,5 +22,6 @@ export {
   usageService,
   planService,
   emailService,
-  chatService
+  chatService,
+  schemaAggregationService
 };

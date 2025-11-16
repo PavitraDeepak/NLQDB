@@ -450,6 +450,9 @@ class ExternalDatabaseService {
 
   async executeMongoDBQueryByUri(connection, queryObj) {
     const uri = connection.decryptUri();
+    if (!uri) {
+      throw new Error('MongoDB URI is not configured for this connection. Please update the connection settings.');
+    }
     const client = new MongoClient(uri, {
       serverSelectionTimeoutMS: connection.connectionOptions?.connectionTimeout || 30000
     });

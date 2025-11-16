@@ -4,6 +4,7 @@ import { DatabaseConnection, QueryResult, AuditQuery, User } from '../models/ind
 import { Logger } from '../middlewares/logger.js';
 import externalDatabaseService from './externalDatabaseService.js';
 import usageService from './usageService.js';
+import schemaAggregationService from './schemaAggregationService.js';
 import crypto from 'crypto';
 
 /**
@@ -249,6 +250,7 @@ Response: {
 
   /**
    * Translate natural language to SQL/MongoDB query
+   * Supports automatic database/table detection when connectionId is not provided
    */
   async translateQuery(naturalLanguageQuery, connectionId, organizationId, userId, context = []) {
     try {
@@ -256,14 +258,55 @@ Response: {
         organizationId, 
         userId, 
         connectionId,
-        queryLength: naturalLanguageQuery.length 
+        queryLength: naturalLanguageQuery.length,
+        autoDetect: !connectionId
       });
+
+      // Auto-detect database and table if connectionId not provided
+      let detectedConnection = null;
+      let detectedTable = null;
+      let alternativeMatches = [];
+      
+      if (!connectionId) {
+        const matches = await schemaAggregationService.findMatchingTables(
+          organizationId,
+          naturalLanguageQuery,
+          { recentTables: context.recentTables || [] }
+        );
+        
+        if (matches.length === 0) {
+          throw new Error('No matching tables found across your databases. Please connect a database first.');
+        }
+        
+        // Use best match
+        const bestMatch = matches[0];
+        connectionId = bestMatch.connectionId;
+        detectedConnection = bestMatch;
+        detectedTable = bestMatch.table;
+        
+        // Store alternative matches for user review
+        alternativeMatches = matches.slice(1, 4).map(m => ({
+          connectionId: m.connectionId,
+          connectionName: m.connectionName,
+          database: m.database,
+          table: m.table,
+          score: m.score,
+          matchReasons: m.matchReasons.slice(0, 2)
+        }));
+        
+        Logger.info('Auto-detected database and table', {
+          connectionId,
+          table: detectedTable,
+          score: bestMatch.score,
+          alternativeCount: alternativeMatches.length
+        });
+      }
 
       // Check cache
       const cacheKey = this._getCacheKey(naturalLanguageQuery, connectionId, context);
       if (this.translationCache.has(cacheKey)) {
         const cachedTranslation = this.translationCache.get(cacheKey);
-        const locationField = dbType === 'mongodb' ? 'collection' : 'table';
+        const locationField = cachedTranslation?.dbType === 'mongodb' ? 'collection' : 'table';
         if (!cachedTranslation?.[locationField]) {
           Logger.debug('Discarding stale cached translation missing location metadata', { cacheKey });
           this.translationCache.delete(cacheKey);
@@ -277,7 +320,7 @@ Response: {
       const connection = await DatabaseConnection.findOne({
         _id: connectionId,
         organizationId
-      });
+      }).select('+encryptedPassword +encryptionIV +encryptedUri +uriEncryptionIV');
 
       if (!connection) {
         throw new Error('Database connection not found or access denied');
@@ -399,10 +442,34 @@ Response: {
       const signature = this._signTranslation(translation, userId, organizationId);
 
       const rawQuery = translation[dbType === 'mongodb' ? 'mongoQuery' : 'sqlQuery'];
-      const collectionName = translation.collection
+      const initialCollection = translation.collection
         || translation.table
         || rawQuery?.collection
         || translation.targetCollection
+        || translation.metadata?.collection
+        || null;
+
+      const resolvedCollection = dbType === 'mongodb'
+        ? this._resolveMongoCollection({
+            candidate: initialCollection,
+            translation: {
+              ...translation,
+              query: rawQuery
+            },
+            schema,
+            naturalLanguageQuery,
+            databaseName
+          })
+        : initialCollection;
+
+      const normalizedFallback = this._normalizeCollectionName(initialCollection);
+      const schemaCollectionMatch = dbType === 'mongodb'
+        ? this._findCollectionMatch(schema?.tables || [], normalizedFallback)
+        : null;
+
+      const finalCollection = resolvedCollection
+        || schemaCollectionMatch
+        || normalizedFallback
         || translation.metadata?.collection
         || null;
 
@@ -417,17 +484,27 @@ Response: {
         warningMessage: translation.warningMessage,
         dbType,
         connectionId,
-        collection: collectionName,
+        collection: finalCollection || 'unknown',
         table: translation.table || null,
         signature,
         tokensUsed,
         llmResponseTime,
         cached: false,
         timestamp: new Date(),
+        autoDetected: !!detectedConnection,
+        detectedFrom: detectedConnection ? {
+          connectionName: detectedConnection.connectionName,
+          database: detectedConnection.database,
+          table: detectedTable,
+          score: detectedConnection.score,
+          matchReasons: detectedConnection.matchReasons,
+          alternatives: alternativeMatches
+        } : null,
         metadata: {
           ...(translation.metadata || {}),
-          collection: collectionName,
-          table: translation.table || null
+          collection: finalCollection || translation.metadata?.collection || null,
+          table: translation.table || null,
+          autoDetected: !!detectedConnection
         },
         originalQuery: naturalLanguageQuery
       };
@@ -487,7 +564,7 @@ Response: {
       const connection = await DatabaseConnection.findOne({
         _id: connectionId,
         organizationId
-      });
+      }).select('+encryptedPassword +encryptionIV +encryptedUri +uriEncryptionIV');
 
       if (!connection) {
         throw new Error('Database connection not found or access denied');
@@ -554,6 +631,7 @@ Response: {
         truncated: results.truncated || false,
         executionTime,
         connectionId,
+        collection: translation.collection || null,
         timestamp: new Date(),
         cached: false
       };
@@ -581,7 +659,8 @@ Response: {
         metadata: {
           dbType: translation.dbType,
           estimatedCost: translation.estimatedCost,
-          tokensUsed: translation.tokensUsed
+          tokensUsed: translation.tokensUsed,
+          collection: translation.collection || null
         }
       });
 
@@ -761,6 +840,157 @@ Response: {
 
   _getResultCacheKey(query, connectionId) {
     return crypto.createHash('md5').update(`${JSON.stringify(query)}:${connectionId}`).digest('hex');
+  }
+
+  _normalizeCollectionName(name) {
+    if (!name || typeof name !== 'string') {
+      return null;
+    }
+
+    const sanitized = name.trim().replace(/[`'"\\]/g, '');
+    if (!sanitized) {
+      return null;
+    }
+
+    const finalSegment = sanitized.split('.').pop();
+    if (!finalSegment) {
+      return null;
+    }
+
+    const normalized = finalSegment.trim().toLowerCase();
+    if (!normalized || normalized === 'unknown' || normalized === 'undefined') {
+      return null;
+    }
+
+    return finalSegment.trim();
+  }
+
+  _findCollectionMatch(tables, candidate) {
+    if (!candidate) {
+      return null;
+    }
+
+    const normalizedCandidate = candidate.toLowerCase();
+    const match = tables.find(table => {
+      if (!table?.name || typeof table.name !== 'string') {
+        return false;
+      }
+      return table.name.toLowerCase() === normalizedCandidate;
+    });
+
+    return match?.name || null;
+  }
+
+  _extractMongoFieldCandidates(query) {
+    const fields = new Set();
+
+    const visit = value => {
+      if (!value) {
+        return;
+      }
+
+      if (Array.isArray(value)) {
+        value.forEach(item => visit(item));
+        return;
+      }
+
+      if (typeof value !== 'object') {
+        return;
+      }
+
+      Object.entries(value).forEach(([key, val]) => {
+        if (typeof key === 'string' && !key.startsWith('$')) {
+          const rootKey = key.split('.')[0];
+          fields.add(rootKey);
+        }
+        visit(val);
+      });
+    };
+
+    visit(query);
+    return fields;
+  }
+
+  _resolveMongoCollection({ candidate, translation = {}, schema = {}, naturalLanguageQuery = '', databaseName }) {
+    const tables = Array.isArray(schema.tables) ? schema.tables : [];
+
+    if (!tables.length) {
+      return this._normalizeCollectionName(candidate);
+    }
+
+    const normalizedCandidate = this._normalizeCollectionName(candidate);
+    const candidateMatch = this._findCollectionMatch(tables, normalizedCandidate);
+    if (candidateMatch) {
+      return candidateMatch;
+    }
+
+    const alternativeCandidates = [
+      translation.collection,
+      translation.table,
+      translation.targetCollection,
+      translation.metadata?.collection,
+      translation.metadata?.table,
+      translation.metadata?.tableName
+    ];
+
+    for (const alt of alternativeCandidates) {
+      const normalized = this._normalizeCollectionName(alt);
+      const match = this._findCollectionMatch(tables, normalized);
+      if (match) {
+        return match;
+      }
+    }
+
+    const fieldCandidates = this._extractMongoFieldCandidates(translation.query);
+    (translation.requiresIndexes || []).forEach(field => {
+      if (typeof field === 'string') {
+        fieldCandidates.add(field.split('.')[0]);
+      }
+    });
+
+    let bestMatch = null;
+    let bestScore = -1;
+    const normalizedQueryText = naturalLanguageQuery.toLowerCase();
+
+    tables.forEach(table => {
+      if (!table?.name) {
+        return;
+      }
+
+      const tableName = table.name;
+      const columnSet = new Set((table.columns || []).map(col => col?.name).filter(Boolean));
+      let score = 0;
+
+      fieldCandidates.forEach(field => {
+        if (!field) {
+          return;
+        }
+        if (columnSet.has(field)) {
+          score += 3;
+        } else if (columnSet.has(field.split('.')[0])) {
+          score += 2;
+        }
+      });
+
+      if (normalizedQueryText.includes(tableName.toLowerCase())) {
+        score += 5;
+      }
+
+      if (databaseName && tableName === databaseName) {
+        score -= 2;
+      }
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestMatch = tableName;
+      }
+    });
+
+    if (bestScore > 0 && bestMatch) {
+      return bestMatch;
+    }
+
+    return tables[0]?.name || candidateMatch || normalizedCandidate || null;
   }
 
   /**
