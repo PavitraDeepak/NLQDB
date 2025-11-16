@@ -4,6 +4,7 @@ import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
 import ChatNew from './pages/ChatNew';
+import ChatClean from './pages/ChatClean';
 import TablesNew from './pages/TablesNew';
 import HistoryNew from './pages/HistoryNew';
 import ApiKeys from './pages/ApiKeys';
@@ -65,6 +66,10 @@ function App() {
       />
       <Route
         path="/chat"
+        element={isAuthenticated ? <ChatClean /> : <Navigate to="/login" />}
+      />
+      <Route
+        path="/chat-old"
         element={isAuthenticated ? <ChatNew /> : <Navigate to="/login" />}
       />
       <Route

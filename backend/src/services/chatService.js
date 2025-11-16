@@ -189,6 +189,19 @@ IMPORTANT: Generate queries based ONLY on the schema provided above. If a reques
     if (dbType === 'mongodb') {
       const examples = [];
       
+      // Always add count example - this is critical
+      examples.push(`User: "How many documents are there?" or "Count total records"
+Response: {
+  "mongoQuery": [
+    { "$count": "total" }
+  ],
+  "collection": "${tableName}",
+  "explain": "Counts the total number of documents in the collection",
+  "requiresIndexes": [],
+  "estimatedCost": 0.2,
+  "safety": "safe"
+}`);
+      
       if (hasStatus) {
         examples.push(`User: "Show me all active records"
 Response: {
@@ -196,6 +209,7 @@ Response: {
     { "$match": { "status": "active" } },
     { "$limit": 100 }
   ],
+  "collection": "${tableName}",
   "explain": "Retrieves all active records, limited to 100 for safety",
   "requiresIndexes": ["status"],
   "estimatedCost": 0.3,
@@ -210,12 +224,26 @@ Response: {
     { "$group": { "_id": { "$month": "$createdAt" }, "count": { "$sum": 1 } } },
     { "$sort": { "_id": 1 } }
   ],
+  "collection": "${tableName}",
   "explain": "Groups records by creation month and counts them, sorted chronologically",
   "requiresIndexes": ["createdAt"],
   "estimatedCost": 0.5,
   "safety": "safe"
 }`);
       }
+      
+      // Add example for listing all documents
+      examples.push(`User: "Show me all records" or "List all documents"
+Response: {
+  "mongoQuery": [
+    { "$limit": 100 }
+  ],
+  "collection": "${tableName}",
+  "explain": "Retrieves all documents, limited to 100 for safety",
+  "requiresIndexes": [],
+  "estimatedCost": 0.3,
+  "safety": "safe"
+}`);
 
       return examples.join('\n\n');
     } else {
@@ -226,6 +254,7 @@ Response: {
         examples.push(`User: "Show me all active records"
 Response: {
   "sqlQuery": "SELECT * FROM ${tableName} WHERE status = 'active' LIMIT 100",
+  "table": "${tableName}",
   "explain": "Retrieves all active records, limited to 100 rows for safety",
   "requiresIndexes": ["status"],
   "estimatedCost": 0.3,
@@ -237,6 +266,7 @@ Response: {
         examples.push(`User: "Find records with 'test' in the name"
 Response: {
   "sqlQuery": "SELECT * FROM ${tableName} WHERE name LIKE '%test%' LIMIT 100",
+  "table": "${tableName}",
   "explain": "Searches for records with 'test' in the name using pattern matching",
   "requiresIndexes": ["name"],
   "estimatedCost": 0.6,
@@ -711,6 +741,13 @@ Response: {
    */
   async _executeWithLimits(connection, translation, options = {}) {
     const limit = Math.min(options.limit || this.MAX_ROWS, this.MAX_ROWS);
+
+    Logger.info('Executing query with limits', {
+      dbType: translation.dbType,
+      collection: translation.collection,
+      query: JSON.stringify(translation.query),
+      limit
+    });
 
     if (translation.dbType === 'mongodb') {
       // MongoDB query execution

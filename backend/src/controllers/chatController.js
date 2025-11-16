@@ -24,23 +24,18 @@ export const translate = asyncHandler(async (req, res) => {
     });
   }
 
-  if (!connectionId) {
-    return res.status(400).json({
-      success: false,
-      error: 'Database connection ID is required'
-    });
-  }
+  // connectionId is now optional - auto-detection will find the right database if not provided
 
   Logger.info('Translate request', { 
     organizationId, 
     userId, 
-    connectionId,
+    connectionId: connectionId || 'auto-detect',
     queryLength: query.length 
   });
 
   const translation = await chatService.translateQuery(
     query,
-    connectionId,
+    connectionId || null,
     organizationId,
     userId,
     context || []
@@ -69,10 +64,13 @@ export const execute = asyncHandler(async (req, res) => {
     });
   }
 
-  if (!connectionId) {
+  // Use connectionId from translation if not provided directly
+  const targetConnectionId = connectionId || translation.connectionId;
+
+  if (!targetConnectionId) {
     return res.status(400).json({
       success: false,
-      error: 'Database connection ID is required'
+      error: 'Database connection ID is required (either directly or from translation)'
     });
   }
 
@@ -89,14 +87,14 @@ export const execute = asyncHandler(async (req, res) => {
   Logger.info('Execute request', { 
     organizationId, 
     userId, 
-    connectionId,
+    connectionId: targetConnectionId,
     translationId: translation.translationId 
   });
 
   const result = await chatService.executeQuery(
     translation.translationId,
     translation,
-    connectionId,
+    targetConnectionId,
     organizationId,
     userId,
     options || {}

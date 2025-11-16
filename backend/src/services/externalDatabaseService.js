@@ -453,6 +453,14 @@ class ExternalDatabaseService {
     if (!uri) {
       throw new Error('MongoDB URI is not configured for this connection. Please update the connection settings.');
     }
+    
+    Logger.info('Executing MongoDB query', {
+      collection: queryObj.collection,
+      operation: queryObj.operation,
+      filter: JSON.stringify(queryObj.filter),
+      options: JSON.stringify(queryObj.options)
+    });
+    
     const client = new MongoClient(uri, {
       serverSelectionTimeoutMS: connection.connectionOptions?.connectionTimeout || 30000
     });
@@ -462,6 +470,8 @@ class ExternalDatabaseService {
       // Extract database name from URI or use connection.database if available
       const dbName = connection.database || client.db().databaseName;
       const db = client.db(dbName);
+      
+      Logger.info('Connected to MongoDB', { database: dbName, collection: queryObj.collection });
       
       const startTime = Date.now();
       const { collection, operation, filter, options } = queryObj;
@@ -485,6 +495,13 @@ class ExternalDatabaseService {
       }
       
       const executionTime = Date.now() - startTime;
+      
+      Logger.info('MongoDB query executed', {
+        operation,
+        resultCount: Array.isArray(result) ? result.length : 1,
+        executionTime
+      });
+      
       await client.close();
 
       return {
@@ -493,6 +510,7 @@ class ExternalDatabaseService {
         executionTime
       };
     } catch (error) {
+      Logger.error('MongoDB query execution failed', { error: error.message, stack: error.stack });
       try { await client.close(); } catch (e) {}
       throw error;
     }
