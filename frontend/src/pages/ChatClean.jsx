@@ -113,6 +113,15 @@ const Chat = () => {
       }
     }
 
+    // For table results with multiple rows, provide context about the data
+    if (rowCount > 1) {
+      const firstResult = result.results[0];
+      const keys = Object.keys(firstResult);
+      const dataDescription = keys.length > 0 ? ` with columns: ${keys.join(', ')}` : '';
+      
+      return `Found ${rowCount.toLocaleString()} results${dataDescription}. Click "View Data" below to explore the table.`;
+    }
+
     // Default messages
     if (rowCount === 0) {
       return "No results found matching your query.";

@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { ChevronDownIcon, ChevronRightIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
+import { ChevronDownIcon, ChevronRightIcon, ArrowDownTrayIcon, ChevronUpIcon, ArrowsUpDownIcon } from '@heroicons/react/24/outline';
 
 export default function ResultsTable({ results, rowCount, executionTime, onExportCSV }) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(true); // Open by default for data tables
+  const [sortColumn, setSortColumn] = useState(null);
+  const [sortDirection, setSortDirection] = useState('asc');
 
   if (!results || (Array.isArray(results) && results.length === 0)) {
     return null;
@@ -20,6 +22,56 @@ export default function ResultsTable({ results, rowCount, executionTime, onExpor
   const columns = Array.isArray(results) && results.length > 0 
     ? Object.keys(results[0]) 
     : [];
+
+  // Sort data
+  const sortedResults = sortColumn ? [...results].sort((a, b) => {
+    const aVal = a[sortColumn];
+    const bVal = b[sortColumn];
+    
+    // Handle null/undefined
+    if (aVal == null && bVal == null) return 0;
+    if (aVal == null) return sortDirection === 'asc' ? 1 : -1;
+    if (bVal == null) return sortDirection === 'asc' ? -1 : 1;
+    
+    // Compare numbers
+    if (typeof aVal === 'number' && typeof bVal === 'number') {
+      return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+    }
+    
+    // Compare strings
+    const aStr = String(aVal).toLowerCase();
+    const bStr = String(bVal).toLowerCase();
+    
+    if (sortDirection === 'asc') {
+      return aStr < bStr ? -1 : aStr > bStr ? 1 : 0;
+    } else {
+      return aStr > bStr ? -1 : aStr < bStr ? 1 : 0;
+    }
+  }) : results;
+
+  const handleSort = (column) => {
+    if (sortColumn === column) {
+      // Toggle direction or clear sort
+      if (sortDirection === 'asc') {
+        setSortDirection('desc');
+      } else {
+        setSortColumn(null);
+        setSortDirection('asc');
+      }
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
+
+  const getSortIcon = (column) => {
+    if (sortColumn !== column) {
+      return <ArrowsUpDownIcon className="w-3.5 h-3.5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />;
+    }
+    return sortDirection === 'asc' 
+      ? <ChevronUpIcon className="w-3.5 h-3.5 text-green-600" />
+      : <ChevronDownIcon className="w-3.5 h-3.5 text-green-600" />;
+  };
 
   return (
     <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
@@ -69,15 +121,19 @@ export default function ResultsTable({ results, rowCount, executionTime, onExpor
                 {columns.map((col) => (
                   <th
                     key={col}
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky top-0 bg-gray-50"
+                    onClick={() => handleSort(col)}
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky top-0 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors group"
                   >
-                    {col}
+                    <div className="flex items-center gap-1.5">
+                      <span>{col}</span>
+                      {getSortIcon(col)}
+                    </div>
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {results.slice(0, 100).map((row, idx) => (
+              {sortedResults.slice(0, 100).map((row, idx) => (
                 <tr key={idx} className="hover:bg-gray-50">
                   {columns.map((col) => (
                     <td
